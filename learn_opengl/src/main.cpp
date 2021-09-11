@@ -6,6 +6,8 @@
 #include <vector>
 
 #include "include_glfw.hpp"
+#include "include_glm.hpp"
+#include "include_imgui.h"
 #include "integer.hpp"
 #include "read_file.hpp"
 #include "shader_helper.h"
@@ -60,6 +62,7 @@ class Window {
   }
 
   void SwapBuffers() { glfwSwapBuffers(window_); }
+  GLFWwindow* GetGlfwWindow() const { return window_; }
 
  private:
   static ui32 MakeWindowId() {
@@ -125,6 +128,98 @@ void InitializeGLAD() {
   UnusedVar(once);
 }
 
+class Model {
+ public:
+  void Create() {
+    vao_ = OpenGl::GenVertexArray();
+    vbo_ = OpenGl::GenBuffer();
+    ebo_ = OpenGl::GenBuffer();
+
+    // bind Vertex Array Object
+    OpenGl::BindVertexArray(vao_);
+
+    // copy our vertices array in a buffer for OpenGL to use
+    OpenGl::BindBuffer(GL_ARRAY_BUFFER, vbo_);
+    OpenGl::BufferData(GL_ARRAY_BUFFER, std::span(vertices), GL_STATIC_DRAW);
+
+    // copy index array in a element buffer
+    OpenGl::BindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_);
+    OpenGl::BufferData(GL_ELEMENT_ARRAY_BUFFER, std::span(indices),
+                       GL_STATIC_DRAW);
+
+    // set our vertex attributes pointers
+    OpenGl::VertexAttribPointer(0, 3, GL_FLOAT, false, 3 * sizeof(float),
+                                nullptr);
+    OpenGl::EnableVertexAttribArray(0);
+  }
+
+  void Bind() { OpenGl::BindVertexArray(vao_); }
+  void Draw() {
+    OpenGl::UseProgram(shader_);
+    OpenGl::DrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT,
+                         nullptr);
+  }
+
+  GLuint shader_;
+  GLuint vao_;  // vertex array object
+  GLuint vbo_;  // vertex buffer object
+  GLuint ebo_;  // element buffer object
+  std::vector<float> vertices;
+  std::vector<ui32> indices;
+};
+
+std::vector<std::unique_ptr<Model>> MakeTestModels(GLuint shader) {
+  std::vector<std::unique_ptr<Model>> models;
+
+  size_t rows = 1;
+  size_t columns = 1;
+  float min_coord = -1.0f;
+  float max_coord = 1.0f;
+
+  const float size_factor = 0.85f;
+  const glm::vec2 coord_zero{min_coord, min_coord};
+  const glm::vec2 coord_extent{max_coord - min_coord, max_coord - min_coord};
+  const glm::vec2 sector_size_x{coord_extent.x / static_cast<float>(columns),
+                                0.0f};
+  const glm::vec2 sector_size_y{0.0f,
+                                coord_extent.y / static_cast<float>(rows)};
+  const glm::vec2 sector_size = (sector_size_x + sector_size_y);
+  const glm::vec2 square_size = sector_size * size_factor;
+
+  for (size_t row = 0; row < rows; ++row) {
+    for (size_t column = 0; column < columns; ++column) {
+      const glm::vec2 offset{sector_size_x * static_cast<float>(column) +
+                             sector_size_y * static_cast<float>(row)};
+
+      const glm::vec2 top_left =
+          coord_zero + offset + (1.0f - size_factor) * 0.5f * sector_size;
+      const glm::vec2 bot_right = top_left + square_size;
+
+      models.push_back(std::make_unique<Model>());
+      models.back()->vertices = {
+          bot_right.x, top_left.y,  0.0f,  // top right
+          bot_right.x, bot_right.y, 0.0f,  // bottom right
+          top_left.x,  bot_right.y, 0.0f,  // bottom left
+          top_left.x,  top_left.y,  0.0f   // top left
+      };
+      models.back()->indices = {
+          0, 1, 3,  // first triangle
+          1, 2, 3   // second triangle
+      };
+      models.back()->shader_ = shader;
+      models.back()->Create();
+    }
+  }
+  return models;
+}
+
+GLuint CreateTestUnlitShader(const std::filesystem::path& shaders_dir) {
+  ShaderProgramInfo shader_info;
+  shader_info.vertex = shaders_dir / "vertex_shader.vert";
+  shader_info.fragment = shaders_dir / "fragment_shader.frag";
+  return MakeShaderProgram(shader_info);
+}
+
 int main(int argc, char** argv) {
   UnusedVar(argc);
 
@@ -141,6 +236,7 @@ int main(int argc, char** argv) {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwSwapInterval(0);
 
     windows.push_back(std::make_unique<Window>());
 
@@ -150,47 +246,17 @@ int main(int argc, char** argv) {
       InitializeGLAD();
     }
 
-    GLuint shader_program;
+    ImGui::CreateContext();
+    ImGui::StyleColorsDark();
+    ImGui_ImplGlfw_InitForOpenGL(windows.back()->GetGlfwWindow(), true);
+    ImGui_ImplOpenGL3_Init("#version 130");
 
-    {
-      ShaderProgramInfo shader_info;
-      shader_info.vertex = shaders_dir / "vertex_shader.vert";
-      shader_info.fragment = shaders_dir / "fragment_shader.frag";
-      shader_program = MakeShaderProgram(shader_info);
-    }
+    const GLuint shader_program = CreateTestUnlitShader(shaders_dir);
+    std::vector<std::unique_ptr<Model>> models = MakeTestModels(shader_program);
 
-    float vertices[] = {
-        0.5f,  0.5f,  0.0f,  // top right
-        0.5f,  -0.5f, 0.0f,  // bottom right
-        -0.5f, -0.5f, 0.0f,  // bottom left
-        -0.5f, 0.5f,  0.0f   // top left
-    };
-
-    unsigned int indices[] = {
-        0, 1, 3,  // first triangle
-        1, 2, 3   // second triangle
-    };
-
-    GLuint VAO;
-    glGenVertexArrays(1, &VAO);
-    GLuint VBO = OpenGl::GenBuffer();
-    GLuint EBO = OpenGl::GenBuffer();
-
-    // bind Vertex Array Object
-    glBindVertexArray(VAO);
-
-    // copy our vertices array in a buffer for OpenGL to use
-    OpenGl::BindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-    // copy index array in a element buffer
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices,
-                 GL_STATIC_DRAW);
-
-    // set our vertex attributes pointers
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
-    glEnableVertexAttribArray(0);
+    bool show_demo_window = true;
+    bool show_another_window = false;
+    ImVec4 clear_color = ImVec4(0.2f, 0.3f, 0.3f, 1.0f);
 
     while (!windows.empty()) {
       for (size_t i = 0; i < windows.size();) {
@@ -205,15 +271,83 @@ int main(int argc, char** argv) {
         window->ProcessInput();
         window->MakeContextCurrent();
 
-        glViewport(0, 0, static_cast<GLsizei>(window->GetWidth()),
-                   static_cast<GLsizei>(window->GetHeight()));
-        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
-        glUseProgram(shader_program);
-        glBindVertexArray(VAO);
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
-        glBindVertexArray(0);
+        OpenGl::SetClearColor(clear_color.x, clear_color.y, clear_color.z,
+                              clear_color.z);
 
+        // Start the Dear ImGui frame
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
+        // 1. Show the big demo window (Most of the sample code is in
+        // ImGui::ShowDemoWindow()! You can browse its code to learn more about
+        // Dear ImGui!).
+        if (show_demo_window) ImGui::ShowDemoWindow(&show_demo_window);
+
+        // 2. Show a simple window that we create ourselves. We use a Begin/End
+        // pair to created a named window.
+        {
+          static float f = 0.0f;
+          static int counter = 0;
+
+          ImGui::Begin("Hello, world!");  // Create a window called "Hello,
+                                          // world!" and append into it.
+
+          ImGui::Text(
+              "This is some useful text.");  // Display some text (you can use a
+                                             // format strings too)
+          ImGui::Checkbox("Demo Window",
+                          &show_demo_window);  // Edit bools storing our window
+                                               // open/close state
+          ImGui::Checkbox("Another Window", &show_another_window);
+
+          ImGui::SliderFloat(
+              "float", &f, 0.0f,
+              1.0f);  // Edit 1 float using a slider from 0.0f to 1.0f
+          ImGui::ColorEdit3(
+              "clear color",
+              reinterpret_cast<float*>(
+                  &clear_color));  // Edit 3 floats representing a color
+
+          if (ImGui::Button(
+                  "Button"))  // Buttons return true when clicked (most widgets
+                              // return true when edited/activated)
+            counter++;
+          ImGui::SameLine();
+          ImGui::Text("counter = %d", counter);
+
+          ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
+                      static_cast<double>(1000.0f / ImGui::GetIO().Framerate),
+                      static_cast<double>(ImGui::GetIO().Framerate));
+          ImGui::End();
+        }
+
+        // 3. Show another simple window.
+        if (show_another_window) {
+          ImGui::Begin(
+              "Another Window",
+              &show_another_window);  // Pass a pointer to our bool variable
+                                      // (the window will have a closing button
+                                      // that will clear the bool when clicked)
+          ImGui::Text("Hello from another window!");
+          if (ImGui::Button("Close Me")) show_another_window = false;
+          ImGui::End();
+        }
+
+        // Rendering
+        ImGui::Render();
+
+        OpenGl::Viewport(0, 0, static_cast<GLsizei>(window->GetWidth()),
+                         static_cast<GLsizei>(window->GetHeight()));
+        OpenGl::Clear(GL_COLOR_BUFFER_BIT);
+
+        for (auto& model : models) {
+          model->Bind();
+          model->Draw();
+        }
+        OpenGl::BindVertexArray(0);
+
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         window->SwapBuffers();
         ++i;
       }

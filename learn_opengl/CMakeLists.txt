@@ -28,11 +28,10 @@ target_link_libraries(${target_name}
 	fmt
 	glm
 	spdlog
+	imgui
 	${OPENGL_LIBRARIES})
 target_compile_definitions(${target_name} PUBLIC
-	-DGLFW_INCLUDE_VULKAN
 	-DGLM_FORCE_RADIANS
-	-DGLM_FORCE_DEPTH_ZERO_TO_ONE
 	-DTINYOBJLOADER_IMPLEMENTATION)
 target_include_directories(${target_name} PUBLIC ${target_src_root})
 
