@@ -1,11 +1,14 @@
-#include <GLFW/glfw3.h>
 #include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <filesystem>
 #include <vector>
 
+#include "include_glfw.hpp"
 #include "integer.hpp"
+#include "read_file.hpp"
+#include "shader_helper.h"
 #include "unused_var.hpp"
 
 class GlfwState {
@@ -35,7 +38,8 @@ class GlfwState {
 
 class Window {
  public:
-  Window(ui32 width = 800, ui32 height = 600) : width_(width), height_(height) {
+  Window(ui32 width = 800, ui32 height = 600)
+      : id_(MakeWindowId()), width_(width), height_(height) {
     Create();
   }
 
@@ -58,6 +62,11 @@ class Window {
   void SwapBuffers() { glfwSwapBuffers(window_); }
 
  private:
+  static ui32 MakeWindowId() {
+    static ui32 next_id = 0;
+    return next_id++;
+  }
+
   static void FrameBufferSizeCallback(GLFWwindow* glfw_window, int width,
                                       int height) {
     void* user_pointer = glfwGetWindowUserPointer(glfw_window);
@@ -78,12 +87,12 @@ class Window {
 
     glfwSetWindowUserPointer(window_, this);
     glfwSetFramebufferSizeCallback(window_, FrameBufferSizeCallback);
-    spdlog::info("Created window");
+    spdlog::info("Created window {:d}", id_);
   }
 
   void Destroy() {
     if (window_) {
-      spdlog::info("Destroyed window");
+      spdlog::info("Destroyed window {:d}", id_);
       glfwDestroyWindow(window_);
       window_ = nullptr;
     }
@@ -95,25 +104,93 @@ class Window {
   }
 
  private:
+  ui32 id_;
   ui32 width_;
   ui32 height_;
   GLFWwindow* window_ = nullptr;
 };
 
-int main() {
-  spdlog::set_level(spdlog::level::trace);
+int InitializeGLAD_impl() {
+  // glad: load all OpenGL function pointers
+  // ---------------------------------------
+  if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress))) {
+    throw std::runtime_error("Failed to initialize GLAD");
+  }
 
-  std::vector<std::unique_ptr<Window>> windows;
+  return 42;
+}
+
+void InitializeGLAD() {
+  static int once = InitializeGLAD_impl();
+  UnusedVar(once);
+}
+
+int main(int argc, char** argv) {
+  UnusedVar(argc);
 
   try {
+    const std::filesystem::path exe_file = std::filesystem::path(argv[0]);
+    spdlog::set_level(spdlog::level::trace);
+    std::vector<std::unique_ptr<Window>> windows;
+
+    const auto content_dir = exe_file.parent_path() / "content";
+    const auto shaders_dir = content_dir / "shaders";
+
     GlfwState glfw_state;
     glfw_state.Initialize();
-
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     windows.push_back(std::make_unique<Window>());
+
+    // GLAD can be initialized only when glfw has window context
+    {
+      windows.front()->MakeContextCurrent();
+      InitializeGLAD();
+    }
+
+    GLuint shader_program;
+
+    {
+      ShaderProgramInfo shader_info;
+      shader_info.vertex = shaders_dir / "vertex_shader.vert";
+      shader_info.fragment = shaders_dir / "fragment_shader.frag";
+      shader_program = MakeShaderProgram(shader_info);
+    }
+
+    float vertices[] = {
+        0.5f,  0.5f,  0.0f,  // top right
+        0.5f,  -0.5f, 0.0f,  // bottom right
+        -0.5f, -0.5f, 0.0f,  // bottom left
+        -0.5f, 0.5f,  0.0f   // top left
+    };
+
+    unsigned int indices[] = {
+        0, 1, 3,  // first triangle
+        1, 2, 3   // second triangle
+    };
+
+    GLuint VAO;
+    glGenVertexArrays(1, &VAO);
+    GLuint VBO = OpenGl::GenBuffer();
+    GLuint EBO = OpenGl::GenBuffer();
+
+    // bind Vertex Array Object
+    glBindVertexArray(VAO);
+
+    // copy our vertices array in a buffer for OpenGL to use
+    OpenGl::BindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    // copy index array in a element buffer
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices,
+                 GL_STATIC_DRAW);
+
+    // set our vertex attributes pointers
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
+    glEnableVertexAttribArray(0);
 
     while (!windows.empty()) {
       for (size_t i = 0; i < windows.size();) {
@@ -126,12 +203,16 @@ int main() {
           continue;
         }
         window->ProcessInput();
-
         window->MakeContextCurrent();
+
         glViewport(0, 0, static_cast<GLsizei>(window->GetWidth()),
                    static_cast<GLsizei>(window->GetHeight()));
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
+        glUseProgram(shader_program);
+        glBindVertexArray(VAO);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
+        glBindVertexArray(0);
 
         window->SwapBuffers();
         ++i;

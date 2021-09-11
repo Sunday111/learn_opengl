@@ -23,6 +23,7 @@ file(GLOB_RECURSE sources_list "${target_src_root}/*.cpp")
 
 add_executable(${target_name} ${sources_list})
 target_link_libraries(${target_name}
+	glad
 	glfw
 	fmt
 	glm
@@ -45,6 +46,7 @@ if(MSVC)
 else()
 	# command warnings for clang and gcc
 	set(compile_opts
+		-Werror # treat warnings as errors
 		-pedantic # Warn on language extensions
 		-Wall -Wextra # reasonable and standard
 		-Wpedantic # (all versions of GCC, Clang >= 3.2) warn if non-standard C++ is used
@@ -77,28 +79,29 @@ else()
 		#)
 	endif()
 	target_compile_options(${target_name} PRIVATE ${compile_opts})
+	message("compile options: ${compile_opts}")
 endif()
 
-# compile shaders
-add_custom_target(compile_shaders)
-add_dependencies(${target_name} compile_shaders)
-file(GLOB_RECURSE shaders_list RELATIVE ${src_shaders_dir} "${src_shaders_dir}/**")
-foreach(shader_src_rel ${shaders_list})
-	set(shader_src_abs ${src_shaders_dir}/${shader_src_rel})
-	get_filename_component(shader_src_name ${shader_src_rel} NAME_WE)
-	get_filename_component(shader_src_dir ${shader_src_rel} DIRECTORY)
-	set(shader_dst_abs ${dst_shaders_dir}/${shader_src_dir}/${shader_src_name}.spv)
-
-	# create desctination directory
-	get_filename_component(shader_dst_dir ${shader_dst_abs} DIRECTORY)
-	file(MAKE_DIRECTORY ${shader_dst_dir})
-
-	add_custom_command(
-		TARGET compile_shaders
-		COMMAND ${Vulkan_GLSLC_EXECUTABLE} ${shader_src_abs} -o ${shader_dst_abs}
-		MAIN_DEPENDENCY ${shader_dst_abs}
-	)
-endforeach()
+## compile shaders
+#add_custom_target(compile_shaders)
+#add_dependencies(${target_name} compile_shaders)
+#file(GLOB_RECURSE shaders_list RELATIVE ${src_shaders_dir} "${src_shaders_dir}/**")
+#foreach(shader_src_rel ${shaders_list})
+#	set(shader_src_abs ${src_shaders_dir}/${shader_src_rel})
+#	get_filename_component(shader_src_name ${shader_src_rel} NAME_WE)
+#	get_filename_component(shader_src_dir ${shader_src_rel} DIRECTORY)
+#	set(shader_dst_abs ${dst_shaders_dir}/${shader_src_dir}/${shader_src_name}.spv)
+#
+#	# create desctination directory
+#	get_filename_component(shader_dst_dir ${shader_dst_abs} DIRECTORY)
+#	file(MAKE_DIRECTORY ${shader_dst_dir})
+#
+#	add_custom_command(
+#		TARGET compile_shaders
+#		COMMAND ${Vulkan_GLSLC_EXECUTABLE} ${shader_src_abs} -o ${shader_dst_abs}
+#		MAIN_DEPENDENCY ${shader_dst_abs}
+#	)
+#endforeach()
 
 function(copy_content_fn)
 	set(options)
@@ -135,4 +138,7 @@ add_dependencies(copy_content copy_textures)
 
 copy_content_fn(TARGET copy_models SRC ${src_models_dir} DST ${dst_models_dir})
 add_dependencies(copy_content copy_models)
+
+copy_content_fn(TARGET copy_shaders SRC ${src_shaders_dir} DST ${dst_shaders_dir})
+add_dependencies(copy_content copy_shaders)
 
