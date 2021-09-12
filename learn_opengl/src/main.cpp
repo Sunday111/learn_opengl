@@ -3,14 +3,18 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <stdexcept>
 #include <vector>
 
+#include "image_loader.hpp"
 #include "include_glfw.hpp"
 #include "include_glm.hpp"
 #include "include_imgui.h"
 #include "integer.hpp"
+#include "properties_widget.hpp"
 #include "read_file.hpp"
 #include "shader_helper.h"
+#include "template/class_member_traits.hpp"
 #include "unused_var.hpp"
 
 class GlfwState {
@@ -128,9 +132,40 @@ void InitializeGLAD() {
   UnusedVar(once);
 }
 
+class Vertex {
+ public:
+  glm::vec3 position;
+  glm::vec2 tex_coord;
+  glm::vec3 color;
+};
+
+template <typename T>
+struct TypeToGlType;
+
+template <>
+struct TypeToGlType<float> {
+  static constexpr size_t Size = 1;
+  static constexpr GLenum Type = GL_FLOAT;
+};
+
+template <typename T, int N>
+struct TypeToGlType<glm::vec<N, T>> {
+  static constexpr size_t Size = static_cast<size_t>(N);
+  static constexpr GLenum Type = TypeToGlType<T>::Type;
+};
+
+template <auto Member>
+[[nodiscard]] size_t MemberOffset() noexcept {
+  using MemberTraits = ClassMemberTraits<decltype(Member)>;
+  using T = typename MemberTraits::Class;
+  auto ptr = &(reinterpret_cast<T const volatile*>(NULL)->*Member);
+  return reinterpret_cast<size_t>(ptr);
+}
+
 class Model {
  public:
-  void Create() {
+  void Create(const std::span<const Vertex>& vertices,
+              const std::span<const ui32>& indices, GLuint texture) {
     vao_ = OpenGl::GenVertexArray();
     vbo_ = OpenGl::GenBuffer();
     ebo_ = OpenGl::GenBuffer();
@@ -147,32 +182,48 @@ class Model {
     OpenGl::BufferData(GL_ELEMENT_ARRAY_BUFFER, std::span(indices),
                        GL_STATIC_DRAW);
 
-    // set our vertex attributes pointers
-    OpenGl::VertexAttribPointer(0, 3, GL_FLOAT, false, 3 * sizeof(float),
-                                nullptr);
-    OpenGl::EnableVertexAttribArray(0);
+    GLuint location = 0;
+    RegisterAttribute<&Vertex::position>(location++, false);
+    RegisterAttribute<&Vertex::tex_coord>(location++, false);
+    RegisterAttribute<&Vertex::color>(location++, false);
+
+    texture_ = texture;
+    num_indices_ = indices.size();
   }
 
-  void Bind() { OpenGl::BindVertexArray(vao_); }
+  template <auto MemberVariablePtr>
+  void RegisterAttribute(GLuint location, bool normalized) {
+    using MemberTraits = ClassMemberTraits<decltype(MemberVariablePtr)>;
+    using GlTypeTraits = TypeToGlType<typename MemberTraits::Member>;
+    const size_t vertex_stride = sizeof(typename MemberTraits::Class);
+    const size_t member_stride = MemberOffset<MemberVariablePtr>();
+    OpenGl::VertexAttribPointer(location, GlTypeTraits::Size,
+                                GlTypeTraits::Type, normalized, vertex_stride,
+                                reinterpret_cast<void*>(member_stride));
+    OpenGl::EnableVertexAttribArray(location);
+  }
+
   void Draw() {
     OpenGl::UseProgram(shader_);
-    OpenGl::DrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT,
-                         nullptr);
+    OpenGl::BindVertexArray(vao_);
+    OpenGl::BindTexture2d(texture_);
+    OpenGl::DrawElements(GL_TRIANGLES, num_indices_, GL_UNSIGNED_INT, nullptr);
   }
 
+  size_t num_indices_ = 0;
   GLuint shader_;
   GLuint vao_;  // vertex array object
   GLuint vbo_;  // vertex buffer object
   GLuint ebo_;  // element buffer object
-  std::vector<float> vertices;
-  std::vector<ui32> indices;
+  GLuint texture_ = 0;
 };
 
-std::vector<std::unique_ptr<Model>> MakeTestModels(GLuint shader) {
+std::vector<std::unique_ptr<Model>> MakeTestModels(GLuint shader,
+                                                   GLuint texture) {
   std::vector<std::unique_ptr<Model>> models;
 
-  size_t rows = 1;
-  size_t columns = 1;
+  size_t rows = 10;
+  size_t columns = 10;
   float min_coord = -1.0f;
   float max_coord = 1.0f;
 
@@ -195,19 +246,36 @@ std::vector<std::unique_ptr<Model>> MakeTestModels(GLuint shader) {
           coord_zero + offset + (1.0f - size_factor) * 0.5f * sector_size;
       const glm::vec2 bot_right = top_left + square_size;
 
-      models.push_back(std::make_unique<Model>());
-      models.back()->vertices = {
-          bot_right.x, top_left.y,  0.0f,  // top right
-          bot_right.x, bot_right.y, 0.0f,  // bottom right
-          top_left.x,  bot_right.y, 0.0f,  // bottom left
-          top_left.x,  top_left.y,  0.0f   // top left
-      };
-      models.back()->indices = {
+      std::array<Vertex, 4> v;
+
+      // top right
+      v[0].position = {bot_right.x, top_left.y, 0.0f};
+      v[0].color = {1.0f, 1.0f, 1.0f};
+      v[0].tex_coord = {1.0f, 1.0f};
+
+      // bottom right
+      v[1].position = {bot_right.x, bot_right.y, 0.0f};
+      v[1].color = {1.0f, 1.0f, 1.0f};
+      v[1].tex_coord = {1.0f, 0.0f};
+
+      // bottom left
+      v[2].position = {top_left.x, bot_right.y, 0.0f};
+      v[2].color = {1.0f, 1.0f, 1.0f};
+      v[2].tex_coord = {0.0f, 0.0f};
+
+      // top left
+      v[3].position = {top_left.x, top_left.y, 0.0f};
+      v[3].color = {1.0f, 1.0f, 1.0f};
+      v[3].tex_coord = {0.0f, 1.0f};
+
+      std::array<ui32, 6> indices = {
           0, 1, 3,  // first triangle
           1, 2, 3   // second triangle
       };
+
+      models.push_back(std::make_unique<Model>());
       models.back()->shader_ = shader;
-      models.back()->Create();
+      models.back()->Create(v, indices, texture);
     }
   }
   return models;
@@ -220,6 +288,21 @@ GLuint CreateTestUnlitShader(const std::filesystem::path& shaders_dir) {
   return MakeShaderProgram(shader_info);
 }
 
+GLuint LoadTexture(const std::filesystem::path& path) {
+  std::string string_path = path.string();
+  ImageLoader image(string_path);
+
+  const GLuint texture = OpenGl::GenTexture();
+  OpenGl::BindTexture2d(texture);
+
+  size_t lod = 0;
+  OpenGl::TexImage2d(GL_TEXTURE_2D, lod, GL_RGB, image.GetWidth(),
+                     image.GetHeight(), GL_RGBA, GL_UNSIGNED_BYTE,
+                     image.GetData().data());
+  OpenGl::GenerateMipmap2d();
+  return texture;
+}
+
 int main(int argc, char** argv) {
   UnusedVar(argc);
 
@@ -230,13 +313,13 @@ int main(int argc, char** argv) {
 
     const auto content_dir = exe_file.parent_path() / "content";
     const auto shaders_dir = content_dir / "shaders";
+    const auto textures_dir = content_dir / "textures";
 
     GlfwState glfw_state;
     glfw_state.Initialize();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwSwapInterval(0);
 
     windows.push_back(std::make_unique<Window>());
 
@@ -246,17 +329,24 @@ int main(int argc, char** argv) {
       InitializeGLAD();
     }
 
+    glfwSwapInterval(0);
     ImGui::CreateContext();
     ImGui::StyleColorsDark();
     ImGui_ImplGlfw_InitForOpenGL(windows.back()->GetGlfwWindow(), true);
     ImGui_ImplOpenGL3_Init("#version 130");
 
+    ParametersWidget parameters;
     const GLuint shader_program = CreateTestUnlitShader(shaders_dir);
-    std::vector<std::unique_ptr<Model>> models = MakeTestModels(shader_program);
 
-    bool show_demo_window = true;
-    bool show_another_window = false;
-    ImVec4 clear_color = ImVec4(0.2f, 0.3f, 0.3f, 1.0f);
+    const ui32 color_uniform =
+        OpenGl::GetUniformLocation(shader_program, "globalColor");
+    const GLuint texture = LoadTexture(textures_dir / "wall.jpg");
+    std::vector<std::unique_ptr<Model>> models =
+        MakeTestModels(shader_program, texture);
+
+    OpenGl::PolygonMode(parameters.GetPolygonMode());
+    glPointSize(parameters.GetPointSize());
+    glLineWidth(parameters.GetLineWidth());
 
     while (!windows.empty()) {
       for (size_t i = 0; i < windows.size();) {
@@ -271,67 +361,24 @@ int main(int argc, char** argv) {
         window->ProcessInput();
         window->MakeContextCurrent();
 
-        OpenGl::SetClearColor(clear_color.x, clear_color.y, clear_color.z,
-                              clear_color.z);
-
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        // 1. Show the big demo window (Most of the sample code is in
-        // ImGui::ShowDemoWindow()! You can browse its code to learn more about
-        // Dear ImGui!).
-        if (show_demo_window) ImGui::ShowDemoWindow(&show_demo_window);
+        parameters.Update();
+        // ImGui::ShowDemoWindow();
 
-        // 2. Show a simple window that we create ourselves. We use a Begin/End
-        // pair to created a named window.
-        {
-          static float f = 0.0f;
-          static int counter = 0;
-
-          ImGui::Begin("Hello, world!");  // Create a window called "Hello,
-                                          // world!" and append into it.
-
-          ImGui::Text(
-              "This is some useful text.");  // Display some text (you can use a
-                                             // format strings too)
-          ImGui::Checkbox("Demo Window",
-                          &show_demo_window);  // Edit bools storing our window
-                                               // open/close state
-          ImGui::Checkbox("Another Window", &show_another_window);
-
-          ImGui::SliderFloat(
-              "float", &f, 0.0f,
-              1.0f);  // Edit 1 float using a slider from 0.0f to 1.0f
-          ImGui::ColorEdit3(
-              "clear color",
-              reinterpret_cast<float*>(
-                  &clear_color));  // Edit 3 floats representing a color
-
-          if (ImGui::Button(
-                  "Button"))  // Buttons return true when clicked (most widgets
-                              // return true when edited/activated)
-            counter++;
-          ImGui::SameLine();
-          ImGui::Text("counter = %d", counter);
-
-          ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
-                      static_cast<double>(1000.0f / ImGui::GetIO().Framerate),
-                      static_cast<double>(ImGui::GetIO().Framerate));
-          ImGui::End();
+        [[unlikely]] if (parameters.PolygonModeChanged()) {
+          OpenGl::PolygonMode(parameters.GetPolygonMode());
         }
 
-        // 3. Show another simple window.
-        if (show_another_window) {
-          ImGui::Begin(
-              "Another Window",
-              &show_another_window);  // Pass a pointer to our bool variable
-                                      // (the window will have a closing button
-                                      // that will clear the bool when clicked)
-          ImGui::Text("Hello from another window!");
-          if (ImGui::Button("Close Me")) show_another_window = false;
-          ImGui::End();
+        [[unlikely]] if (parameters.PointSizeChanged()) {
+          OpenGl::PointSize(parameters.GetPointSize());
+        }
+
+        [[unlikely]] if (parameters.LineWidthChanged()) {
+          OpenGl::LineWidth(parameters.GetLineWidth());
         }
 
         // Rendering
@@ -340,9 +387,16 @@ int main(int argc, char** argv) {
         OpenGl::Viewport(0, 0, static_cast<GLsizei>(window->GetWidth()),
                          static_cast<GLsizei>(window->GetHeight()));
         OpenGl::Clear(GL_COLOR_BUFFER_BIT);
-
+        OpenGl::SetClearColor(parameters.GetClearColor());
+        OpenGl::SetUniform(color_uniform, parameters.GetGlobalColor());
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+        OpenGl::SetTexture2dBorderColor(GL_TEXTURE_2D,
+                                        parameters.GetBorderColor());
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                        GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         for (auto& model : models) {
-          model->Bind();
           model->Draw();
         }
         OpenGl::BindVertexArray(0);

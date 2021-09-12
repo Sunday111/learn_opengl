@@ -23,6 +23,7 @@ file(GLOB_RECURSE sources_list "${target_src_root}/*.cpp")
 
 add_executable(${target_name} ${sources_list})
 target_link_libraries(${target_name}
+	stb
 	glad
 	glfw
 	fmt
