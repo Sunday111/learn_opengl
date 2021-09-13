@@ -2,7 +2,6 @@
 
 #include <fmt/format.h>
 
-#include <format>
 #include <stdexcept>
 
 template <typename T>
@@ -100,7 +99,7 @@ ui32 OpenGl::GetUniformLocation(GLuint shader_program, const char* name) {
   [[likely]] if (location.has_value()) return *location;
 
   throw std::invalid_argument(
-      std::format("Uniform with name {} was not found", name));
+      fmt::format("Uniform with name {} was not found", name));
 }
 
 void OpenGl::SetUniform(ui32 location, const glm::vec4& v) noexcept {

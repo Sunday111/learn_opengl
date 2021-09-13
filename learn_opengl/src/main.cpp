@@ -222,8 +222,8 @@ std::vector<std::unique_ptr<Model>> MakeTestModels(GLuint shader,
                                                    GLuint texture) {
   std::vector<std::unique_ptr<Model>> models;
 
-  size_t rows = 10;
-  size_t columns = 10;
+  size_t rows = 1;
+  size_t columns = 1;
   float min_coord = -1.0f;
   float max_coord = 1.0f;
 
