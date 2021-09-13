@@ -1,11 +1,23 @@
 #pragma once
 
+#include <array>
 #include <stdexcept>
+#include <string>
+#include <tuple>
 #include <type_traits>
+#include <vector>
 
 #include "gl_api.hpp"
+#include "include_imgui.h"
 
 namespace properties_container_impl {
+template <typename Index, typename Value>
+struct TypedIndex {
+  using ValueType = Value;
+  using IndexType = Index;
+  IndexType index;
+};
+
 template <typename T>
 struct PropertyTypeStorage {
   std::vector<bool> changed;
@@ -34,6 +46,17 @@ struct PropertiesContainer {
   }
 
   template <typename T>
+  void AddProperty(TypedIndex<Index, T>& index, T&& initial = T{}) {
+    index.index = AddProperty<T>(std::forward<T>(initial));
+  }
+
+  template <typename T>
+  [[nodiscard]] bool PropertyChanged(
+      const TypedIndex<Index, T>& index) const noexcept {
+    return PropertyChanged<T>(index.index);
+  }
+
+  template <typename T>
   [[nodiscard]] bool PropertyChanged(Index index) const noexcept {
     return GetTypeStorage<T>().changed[index];
   }
@@ -44,8 +67,19 @@ struct PropertiesContainer {
   }
 
   template <typename T>
+  [[nodiscard]] T& GetProperty(TypedIndex<Index, T> index) noexcept {
+    return GetProperty<T>(index.index);
+  }
+
+  template <typename T>
   [[nodiscard]] const T& GetProperty(Index index) const noexcept {
     return GetTypeStorage<T>().values[index];
+  }
+
+  template <typename T>
+  [[nodiscard]] const T& GetProperty(
+      TypedIndex<Index, T> index) const noexcept {
+    return GetProperty<T>(index.index);
   }
 
   template <typename T>
@@ -59,6 +93,11 @@ struct PropertiesContainer {
   template <typename T>
   void SetChanged(Index index, bool value) noexcept {
     GetTypeStorage<T>().changed[index] = value;
+  }
+
+  template <typename T>
+  void SetChanged(TypedIndex<Index, T> index, bool value) noexcept {
+    SetChanged<T>(index.index, value);
   }
 
  private:
@@ -78,61 +117,168 @@ struct PropertiesContainer {
 }  // namespace properties_container_impl
 
 struct ParametersWidget {
-  using PolygonModeU = std::underlying_type_t<GlPolygonMode>;
   using PropIndex = ui8;
-  using PropsData =
-      properties_container_impl::PropertiesContainer<PropIndex, glm::vec4,
-                                                     float, PolygonModeU, bool>;
+  using PropsData = properties_container_impl::PropertiesContainer<
+      PropIndex, glm::vec2, glm::vec4, float, GlPolygonMode, bool,
+      GlTextureWrapMode>;
 
-  template <typename T, size_t N>
-  union BitfieldHelper {
-    T fill;
-    T value : N;
-  };
+  template <typename T>
+  using TypedIndex = properties_container_impl::TypedIndex<PropIndex, T>;
+  using ColorIndex = TypedIndex<glm::vec4>;
+  using FloatIndex = TypedIndex<float>;
 
-  ParametersWidget() {
-    clear_color_idx_ =
-        props_data_.AddProperty<glm::vec4>({0.2f, 0.3f, 0.3f, 1.0f});
-    global_color_idx_ =
-        props_data_.AddProperty<glm::vec4>({0.5f, 0.0f, 0.0f, 1.0f});
-    border_color_idx_ =
-        props_data_.AddProperty<glm::vec4>({0.0f, 0.0f, 0.0f, 1.0f});
-    line_width_idx_ = props_data_.AddProperty<float>(1.0f);
-    point_size_idx_ = props_data_.AddProperty<float>(1.0f);
-    polygon_mode_idx_ = props_data_.AddProperty<PolygonModeU>(2);
+  template <typename T, typename Enable = std::enable_if_t<std::is_enum_v<T>>>
+  using EnumIndex = TypedIndex<T>;
 
-    polygon_modes_[0] = "point";
-    polygon_modes_[1] = "line";
-    polygon_modes_[2] = "fill";
+  ParametersWidget();
+
+  void Update();
+
+  // Point Size Changed
+
+  [[nodiscard]] auto GetPointSizeIndex() const noexcept {
+    return point_size_idx_;
   }
 
-  void ColorProperty(const char* title, PropIndex index) noexcept {
-    auto& value = props_data_.GetProperty<glm::vec4>(index);
-    auto new_value = value;
-    ImGui::ColorEdit3(title, reinterpret_cast<float*>(&new_value));
-    [[unlikely]] if (ColorChanged(new_value, value)) {
-      value = new_value;
-      props_data_.SetChanged<glm::vec4>(index, true);
+  [[nodiscard]] bool PointSizeChanged() const noexcept {
+    return props_data_.PropertyChanged(point_size_idx_);
+  }
+
+  [[nodiscard]] float GetPointSize() const noexcept {
+    return props_data_.GetProperty(point_size_idx_);
+  }
+
+  // Line Width
+
+  [[nodiscard]] auto GetLineWidthIndex() const noexcept {
+    return line_width_idx_;
+  }
+
+  [[nodiscard]] bool LineWidthChanged() const noexcept {
+    return props_data_.PropertyChanged(line_width_idx_);
+  }
+
+  [[nodiscard]] float GetLineWidth() const noexcept {
+    return props_data_.GetProperty(line_width_idx_);
+  }
+
+  // Polygon Mode
+
+  [[nodiscard]] auto GetPolygonModeIndex() const noexcept {
+    return polygon_mode_idx_;
+  }
+
+  [[nodiscard]] bool PolygonModeChanged() const noexcept {
+    return props_data_.PropertyChanged(polygon_mode_idx_);
+  }
+
+  [[nodiscard]] GlPolygonMode GetPolygonMode() const noexcept {
+    return GetEnumProperty<GlPolygonMode>(polygon_mode_idx_);
+  }
+
+  // Clear Color
+
+  [[nodiscard]] auto GetClearColorIndex() const noexcept {
+    return clear_color_idx_;
+  }
+
+  [[nodiscard]] bool ClearColorChanged() const noexcept {
+    return props_data_.PropertyChanged(clear_color_idx_);
+  }
+
+  [[nodiscard]] const glm::vec4& GetClearColor() const noexcept {
+    return props_data_.GetProperty(clear_color_idx_);
+  }
+
+  // Global Color
+
+  [[nodiscard]] auto GetGlobalColorIndex() const noexcept {
+    return global_color_idx_;
+  }
+
+  [[nodiscard]] bool GlobalColorChanged() const noexcept {
+    return props_data_.PropertyChanged(global_color_idx_);
+  }
+
+  [[nodiscard]] const glm::vec4& GetGlobalColor() const noexcept {
+    return props_data_.GetProperty(global_color_idx_);
+  }
+
+  // Border Color
+
+  [[nodiscard]] auto GetBorderColorIndex() const noexcept {
+    return border_color_idx_;
+  }
+
+  [[nodiscard]] bool BorderColorChanged() const noexcept {
+    return props_data_.PropertyChanged(GetBorderColorIndex());
+  }
+
+  [[nodiscard]] const glm::vec4& GetBorderColor() const noexcept {
+    return props_data_.GetProperty(GetBorderColorIndex());
+  }
+
+  // Get texture coordinate multiplier
+  [[nodiscard]] glm::vec2 GetTexCoordMultiplier() const noexcept {
+    return props_data_.GetProperty(tex_mult_);
+  }
+
+  [[nodiscard]] auto GetTexCoordMultiplierIndex() const noexcept {
+    return tex_mult_;
+  }
+
+  // Get wrap mode
+  [[nodiscard]] auto GetTextureWrapModeSIndex() const noexcept {
+    return wrap_mode_s_;
+  }
+
+  [[nodiscard]] auto GetTextureWrapModeTIndex() const noexcept {
+    return wrap_mode_t_;
+  }
+
+  [[nodiscard]] auto GetTextureWrapModeRIndex() const noexcept {
+    return wrap_mode_r_;
+  }
+
+  // Generic
+  template <bool force = false, typename IndexType, typename F>
+  void CheckPropertyChange(IndexType index, F&& function) const noexcept {
+    if constexpr (!force) {
+      [[likely]] if (!props_data_.PropertyChanged(index)) { return; }
     }
+
+    function(props_data_.GetProperty(index));
   }
 
-  void FloatProperty(const char* title, PropIndex index, float min,
-                     float max) noexcept {
-    auto& value = props_data_.GetProperty<float>(index);
+  template <typename IndexType>
+  auto GetProperty(IndexType index) const noexcept {
+    return props_data_.GetProperty(index);
+  }
+
+ private:
+  void PolygonModeWidget();
+  void ColorProperty(const char* title, ColorIndex index) noexcept;
+  void FloatProperty(const char* title, FloatIndex index, float min,
+                     float max) noexcept;
+
+  template <typename T, int N>
+  void VectorProperty(const char* title, TypedIndex<glm::vec<N, T>> index,
+                      float min, float max) noexcept {
+    auto& value = props_data_.GetProperty(index);
     auto new_value = value;
-    ImGui::SliderFloat(title, &new_value, min, max);
-    [[unlikely]] if (FloatChanged(new_value, value)) {
+    ImGui::DragFloat2(title, &new_value.x, 0.01f, min, max);
+    [[unlikely]] if (VectorChanged(new_value, value)) {
       value = new_value;
-      props_data_.SetChanged<float>(index, true);
+      props_data_.SetChanged(index, true);
     }
   }
 
   template <typename T, size_t Extent>
-  void EnumProperty(const char* title, PropIndex index,
+  void EnumProperty(const char* title, EnumIndex<T> index,
                     std::span<std::string, Extent> values) {
     using U = std::underlying_type_t<T>;
-    auto& value = props_data_.GetProperty<U>(index);
-    auto new_value = value;
+    auto& value = props_data_.GetProperty(index);
+    auto new_value = static_cast<U>(value);
 
     const char* selected_item = values[new_value].data();
     if (ImGui::BeginCombo(title, selected_item)) {
@@ -150,111 +296,48 @@ struct ParametersWidget {
       ImGui::EndCombo();
     }
 
-    [[unlikely]] if (value != new_value) {
-      value = new_value;
-      props_data_.SetChanged<U>(index, true);
+    [[unlikely]] if (value != static_cast<T>(new_value)) {
+      value = static_cast<T>(new_value);
+      props_data_.SetChanged(index, true);
     }
   }
 
-  void ClearColorWidget() { ColorProperty("clear color", clear_color_idx_); }
-
-  void MultiplyColorWidget() {
-    ColorProperty("draw color multiplier", global_color_idx_);
+  template <typename T>
+  [[nodiscard]] T GetEnumProperty(EnumIndex<T> index) const noexcept {
+    return static_cast<T>(props_data_.GetProperty(index));
   }
 
-  void BorderColorWidget() { ColorProperty("border color", border_color_idx_); }
-
-  void FPSWidget() {
-    ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
-                static_cast<double>(1000.0f / ImGui::GetIO().Framerate),
-                static_cast<double>(ImGui::GetIO().Framerate));
-  }
-
-  void PolygonModeWidget() {
-    if (ImGui::CollapsingHeader("Polygon Mode")) {
-      EnumProperty<GlPolygonMode>("mode", polygon_mode_idx_,
-                                  std::span(polygon_modes_));
-
-      const GlPolygonMode mode = GetPolygonMode();
-      if (mode == GlPolygonMode::Point) {
-        FloatProperty("Point diameter", point_size_idx_, 1.0f, 100.0f);
-      } else if (mode == GlPolygonMode::Line) {
-        FloatProperty("Line width", line_width_idx_, 1.0f, 10.0f);
-      }
+  template <typename T, int N>
+  [[nodiscard]] static bool VectorChanged(const glm::vec<N, T>& a,
+                                          const glm::vec<N, T>& b) noexcept {
+    bool result = false;
+    for (int i = 0; i < N; ++i) {
+      result |= FloatChanged(a[i], b[i]);
     }
-  }
-
-  void Update() {
-    ImGui::Begin("Settings");
-    props_data_.SetAllFlags(false);
-    FPSWidget();
-    ClearColorWidget();
-    MultiplyColorWidget();
-    BorderColorWidget();
-    PolygonModeWidget();
-    ImGui::End();
-  }
-
-  [[nodiscard]] bool PointSizeChanged() const noexcept {
-    return props_data_.PropertyChanged<float>(point_size_idx_);
-  }
-
-  [[nodiscard]] float GetPointSize() const noexcept {
-    return props_data_.GetProperty<float>(point_size_idx_);
-  }
-
-  [[nodiscard]] bool LineWidthChanged() const noexcept {
-    return props_data_.PropertyChanged<float>(line_width_idx_);
-  }
-
-  [[nodiscard]] float GetLineWidth() const noexcept {
-    return props_data_.GetProperty<float>(line_width_idx_);
-  }
-
-  [[nodiscard]] bool PolygonModeChanged() const noexcept {
-    return props_data_.PropertyChanged<PolygonModeU>(polygon_mode_idx_);
-  }
-
-  [[nodiscard]] GlPolygonMode GetPolygonMode() const noexcept {
-    const auto u = props_data_.GetProperty<PolygonModeU>(polygon_mode_idx_);
-    switch (u) {
-      case 0:
-        return GlPolygonMode::Point;
-      case 1:
-        return GlPolygonMode::Line;
-      default:
-        return GlPolygonMode::Fill;
-    }
-  }
-  [[nodiscard]] static bool ColorChanged(const glm::vec4& a,
-                                         const glm::vec4& b) noexcept {
-    return FloatChanged(a.r, b.r) | FloatChanged(a.g, b.g) |
-           FloatChanged(a.b, b.b) | FloatChanged(a.a, b.a);
+    return result;
   }
 
   [[nodiscard]] static bool FloatChanged(float a, float b) noexcept {
     return std::abs(a - b) > 0.0001f;
   }
 
-  [[nodiscard]] const glm::vec4& GetClearColor() const noexcept {
-    return props_data_.GetProperty<glm::vec4>(clear_color_idx_);
-  }
-
-  [[nodiscard]] const glm::vec4& GetGlobalColor() const noexcept {
-    return props_data_.GetProperty<glm::vec4>(global_color_idx_);
-  }
-
-  [[nodiscard]] const glm::vec4& GetBorderColor() const noexcept {
-    return props_data_.GetProperty<glm::vec4>(border_color_idx_);
-  }
-
-  std::array<std::string, 3> polygon_modes_;
+ private:
+  static constexpr size_t kNumPolygonModes =
+      static_cast<size_t>(GlPolygonMode::Max);
+  static constexpr size_t kNumTextureWrapModes =
+      static_cast<size_t>(GlTextureWrapMode::Max);
+  std::array<std::string, kNumTextureWrapModes> polygon_modes_;
+  std::array<std::string, kNumTextureWrapModes> wrap_modes_;
 
   PropsData props_data_;
-  PropIndex clear_color_idx_;
-  PropIndex global_color_idx_;
-  PropIndex border_color_idx_;
-  PropIndex line_width_idx_;
-  PropIndex point_size_idx_;
-  PropIndex polygon_mode_idx_;
+  ColorIndex clear_color_idx_;
+  ColorIndex global_color_idx_;
+  ColorIndex border_color_idx_;
+  FloatIndex line_width_idx_;
+  FloatIndex point_size_idx_;
+  TypedIndex<glm::vec2> tex_mult_;
+  EnumIndex<GlPolygonMode> polygon_mode_idx_;
+  EnumIndex<GlTextureWrapMode> wrap_mode_s_;
+  EnumIndex<GlTextureWrapMode> wrap_mode_t_;
+  EnumIndex<GlTextureWrapMode> wrap_mode_r_;
 };

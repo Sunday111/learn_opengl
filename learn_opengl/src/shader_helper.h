@@ -86,13 +86,10 @@ auto OnScopeLeave(Function&& fn) {
   GLuint vertex_shader;
   GLuint fragment_shader;
 
-  auto scope_guard = OnScopeLeave([&]() {
-    glDeleteShader(vertex_shader);
-    glDeleteShader(fragment_shader);
-  });
-
   vertex_shader = MakeShader(GL_VERTEX_SHADER, info.vertex);
+  auto vert_deleter = OnScopeLeave([&]() { glDeleteShader(vertex_shader); });
   fragment_shader = MakeShader(GL_FRAGMENT_SHADER, info.fragment);
+  auto frag_deleter = OnScopeLeave([&]() { glDeleteShader(fragment_shader); });
 
   return LinkShaders(std::array{vertex_shader, fragment_shader});
 }

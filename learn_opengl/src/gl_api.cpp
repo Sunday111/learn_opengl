@@ -2,6 +2,7 @@
 
 #include <fmt/format.h>
 
+#include <format>
 #include <stdexcept>
 
 template <typename T>
@@ -99,5 +100,76 @@ ui32 OpenGl::GetUniformLocation(GLuint shader_program, const char* name) {
   [[likely]] if (location.has_value()) return *location;
 
   throw std::invalid_argument(
-      fmt::format("Uniform with name {} was not found", name));
+      std::format("Uniform with name {} was not found", name));
 }
+
+void OpenGl::SetUniform(ui32 location, const glm::vec4& v) noexcept {
+  glUniform4f(static_cast<GLint>(location), v.r, v.g, v.b, v.a);
+}
+
+void OpenGl::SetUniform(ui32 location, const glm::vec3& v) noexcept {
+  glUniform3f(static_cast<GLint>(location), v.r, v.g, v.b);
+}
+
+void OpenGl::SetUniform(ui32 location, const glm::vec2& v) noexcept {
+  glUniform2f(static_cast<GLint>(location), v.r, v.g);
+}
+
+void OpenGl::SetTextureParameter(GLenum target, GLenum pname,
+                                 const GLfloat* value) noexcept {
+  glTexParameterfv(target, pname, value);
+}
+
+void OpenGl::SetTextureParameter(GLenum target, GLenum name,
+                                 GLint param) noexcept {
+  glTexParameteri(target, name, param);
+}
+
+void OpenGl::SetTexture2dBorderColor(const glm::vec4& v) noexcept {
+  SetTextureParameter2d(GL_TEXTURE_BORDER_COLOR,
+                        reinterpret_cast<const float*>(&v));
+}
+
+void OpenGl::SetTexture2dWrap(GlTextureWrap wrap,
+                              GlTextureWrapMode mode) noexcept {
+  SetTextureParameter2d(ConvertEnum(wrap), ConvertEnum(mode));
+}
+
+void OpenGl::SetTexture2dMinFilter(GlTextureFilter filter) noexcept {
+  SetTextureParameter2d(GL_TEXTURE_MIN_FILTER, ConvertEnum(filter));
+}
+
+void OpenGl::SetTexture2dMagFilter(GlTextureFilter filter) noexcept {
+  SetTextureParameter2d(GL_TEXTURE_MAG_FILTER, ConvertEnum(filter));
+}
+
+void OpenGl::BindTexture(GLenum target, GLuint texture) noexcept {
+  glBindTexture(target, texture);
+}
+
+void OpenGl::BindTexture2d(GLuint texture) {
+  BindTexture(GL_TEXTURE_2D, texture);
+}
+
+void OpenGl::TexImage2d(GLenum target, size_t level_of_detail,
+                        GLint internal_format, size_t width, size_t height,
+                        GLenum data_format, GLenum pixel_data_type,
+                        const void* pixels) noexcept {
+  glTexImage2D(target, static_cast<GLint>(level_of_detail), internal_format,
+               static_cast<GLsizei>(width), static_cast<GLsizei>(height), 0,
+               data_format, pixel_data_type, pixels);
+}
+
+void OpenGl::GenerateMipmap(GLenum target) noexcept {
+  glGenerateMipmap(target);
+}
+
+void OpenGl::GenerateMipmap2d() noexcept { GenerateMipmap(GL_TEXTURE_2D); }
+
+void OpenGl::PolygonMode(GlPolygonMode mode) noexcept {
+  const GLenum converted = ConvertEnum(mode);
+  glPolygonMode(GL_FRONT_AND_BACK, converted);
+}
+
+void OpenGl::PointSize(float size) noexcept { glPointSize(size); }
+void OpenGl::LineWidth(float width) noexcept { glLineWidth(width); }

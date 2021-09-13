@@ -33,7 +33,8 @@ target_link_libraries(${target_name}
 	${OPENGL_LIBRARIES})
 target_compile_definitions(${target_name} PUBLIC
 	-DGLM_FORCE_RADIANS
-	-DTINYOBJLOADER_IMPLEMENTATION)
+	-DTINYOBJLOADER_IMPLEMENTATION
+	-DSPDLOG_FMT_EXTERNAL)
 target_include_directories(${target_name} PUBLIC ${target_src_root})
 
 if(MSVC)
@@ -79,29 +80,7 @@ else()
 		#)
 	endif()
 	target_compile_options(${target_name} PRIVATE ${compile_opts})
-	message("compile options: ${compile_opts}")
 endif()
-
-## compile shaders
-#add_custom_target(compile_shaders)
-#add_dependencies(${target_name} compile_shaders)
-#file(GLOB_RECURSE shaders_list RELATIVE ${src_shaders_dir} "${src_shaders_dir}/**")
-#foreach(shader_src_rel ${shaders_list})
-#	set(shader_src_abs ${src_shaders_dir}/${shader_src_rel})
-#	get_filename_component(shader_src_name ${shader_src_rel} NAME_WE)
-#	get_filename_component(shader_src_dir ${shader_src_rel} DIRECTORY)
-#	set(shader_dst_abs ${dst_shaders_dir}/${shader_src_dir}/${shader_src_name}.spv)
-#
-#	# create desctination directory
-#	get_filename_component(shader_dst_dir ${shader_dst_abs} DIRECTORY)
-#	file(MAKE_DIRECTORY ${shader_dst_dir})
-#
-#	add_custom_command(
-#		TARGET compile_shaders
-#		COMMAND ${Vulkan_GLSLC_EXECUTABLE} ${shader_src_abs} -o ${shader_dst_abs}
-#		MAIN_DEPENDENCY ${shader_dst_abs}
-#	)
-#endforeach()
 
 function(copy_content_fn)
 	set(options)

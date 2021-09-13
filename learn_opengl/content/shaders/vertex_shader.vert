@@ -1,6 +1,7 @@
 #version 330 core
 
 uniform vec4 globalColor;
+uniform vec2 texCoordMultiplier;
 
 layout(location = 0) in vec3 inVertexLocation;
 layout(location = 1) in vec2 inTexCoord;
@@ -12,5 +13,5 @@ out vec2 texCoord;
 void main() {
   gl_Position = vec4(inVertexLocation, 1.0f);
   vertexColor = globalColor * vec4(inVertexColor, 1.0f);
-  texCoord = inTexCoord;
+  texCoord = inTexCoord * texCoordMultiplier;
 }

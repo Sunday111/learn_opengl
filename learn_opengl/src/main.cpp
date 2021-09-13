@@ -303,6 +303,29 @@ GLuint LoadTexture(const std::filesystem::path& path) {
   return texture;
 }
 
+template <bool force = false>
+void UpdateProperties(const ParametersWidget& w) noexcept {
+  auto check_prop = [&](auto index, auto fn) {
+    w.CheckPropertyChange<force>(index, fn);
+  };
+
+  check_prop(w.GetPolygonModeIndex(), OpenGl::PolygonMode);
+  check_prop(w.GetPointSizeIndex(), OpenGl::PointSize);
+  check_prop(w.GetLineWidthIndex(), OpenGl::LineWidth);
+  check_prop(w.GetBorderColorIndex(), OpenGl::SetTexture2dBorderColor);
+  check_prop(w.GetClearColorIndex(),
+             [](auto clear_color) { OpenGl::SetClearColor(clear_color); });
+  check_prop(w.GetTextureWrapModeSIndex(), [](auto mode) {
+    OpenGl::SetTexture2dWrap(GlTextureWrap::S, mode);
+  });
+  check_prop(w.GetTextureWrapModeTIndex(), [](auto mode) {
+    OpenGl::SetTexture2dWrap(GlTextureWrap::T, mode);
+  });
+  check_prop(w.GetTextureWrapModeRIndex(), [](auto mode) {
+    OpenGl::SetTexture2dWrap(GlTextureWrap::R, mode);
+  });
+}
+
 int main(int argc, char** argv) {
   UnusedVar(argc);
 
@@ -340,13 +363,16 @@ int main(int argc, char** argv) {
 
     const ui32 color_uniform =
         OpenGl::GetUniformLocation(shader_program, "globalColor");
+    const ui32 tex_mul_uniform =
+        OpenGl::GetUniformLocation(shader_program, "texCoordMultiplier");
     const GLuint texture = LoadTexture(textures_dir / "wall.jpg");
     std::vector<std::unique_ptr<Model>> models =
         MakeTestModels(shader_program, texture);
 
-    OpenGl::PolygonMode(parameters.GetPolygonMode());
-    glPointSize(parameters.GetPointSize());
-    glLineWidth(parameters.GetLineWidth());
+    UpdateProperties<true>(parameters);
+    OpenGl::UseProgram(shader_program);
+    OpenGl::SetUniform(color_uniform, parameters.GetGlobalColor());
+    OpenGl::SetUniform(tex_mul_uniform, parameters.GetTexCoordMultiplier());
 
     while (!windows.empty()) {
       for (size_t i = 0; i < windows.size();) {
@@ -369,17 +395,7 @@ int main(int argc, char** argv) {
         parameters.Update();
         // ImGui::ShowDemoWindow();
 
-        [[unlikely]] if (parameters.PolygonModeChanged()) {
-          OpenGl::PolygonMode(parameters.GetPolygonMode());
-        }
-
-        [[unlikely]] if (parameters.PointSizeChanged()) {
-          OpenGl::PointSize(parameters.GetPointSize());
-        }
-
-        [[unlikely]] if (parameters.LineWidthChanged()) {
-          OpenGl::LineWidth(parameters.GetLineWidth());
-        }
+        UpdateProperties(parameters);
 
         // Rendering
         ImGui::Render();
@@ -387,15 +403,18 @@ int main(int argc, char** argv) {
         OpenGl::Viewport(0, 0, static_cast<GLsizei>(window->GetWidth()),
                          static_cast<GLsizei>(window->GetHeight()));
         OpenGl::Clear(GL_COLOR_BUFFER_BIT);
-        OpenGl::SetClearColor(parameters.GetClearColor());
-        OpenGl::SetUniform(color_uniform, parameters.GetGlobalColor());
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
-        OpenGl::SetTexture2dBorderColor(GL_TEXTURE_2D,
-                                        parameters.GetBorderColor());
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
-                        GL_LINEAR_MIPMAP_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        parameters.CheckPropertyChange(
+            parameters.GetGlobalColorIndex(), [&](const glm::vec4& color) {
+              OpenGl::SetUniform(color_uniform, color);
+            });
+
+        parameters.CheckPropertyChange(parameters.GetTexCoordMultiplierIndex(),
+                                       [&](const glm::vec2& color) {
+                                         OpenGl::SetUniform(tex_mul_uniform,
+                                                            color);
+                                       });
+        OpenGl::SetTexture2dMinFilter(GlTextureFilter::LinearMipmapLinear);
+        OpenGl::SetTexture2dMagFilter(GlTextureFilter::Linear);
         for (auto& model : models) {
           model->Draw();
         }
