@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <vector>
 
+#include "debug/gl_debug_messenger.hpp"
 #include "image_loader.hpp"
 #include "include_glfw.hpp"
 #include "include_glm.hpp"
@@ -343,6 +344,9 @@ int main(int argc, char** argv) {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+#ifndef NDEBUG
+    glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
+#endif
 
     windows.push_back(std::make_unique<Window>());
 
@@ -351,6 +355,8 @@ int main(int argc, char** argv) {
       windows.front()->MakeContextCurrent();
       InitializeGLAD();
     }
+
+    GlDebugMessenger::Start();
 
     glfwSwapInterval(0);
     ImGui::CreateContext();
