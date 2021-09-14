@@ -9,6 +9,10 @@
 
 #include "gl_api.hpp"
 #include "include_imgui.h"
+#include "unused_var.hpp"
+
+template <typename T>
+concept Enumeration = std::is_enum_v<T>;
 
 namespace properties_container_impl {
 template <typename Index, typename Value>
@@ -119,20 +123,41 @@ struct PropertiesContainer {
 struct ParametersWidget {
   using PropIndex = ui8;
   using PropsData = properties_container_impl::PropertiesContainer<
-      PropIndex, glm::vec2, glm::vec4, float, GlPolygonMode, bool,
-      GlTextureWrapMode>;
+      PropIndex, float, bool, GlTextureWrapMode, GlTextureFilter, GlPolygonMode,
+      glm::vec2, glm::vec4, glm::mat4>;
 
   template <typename T>
   using TypedIndex = properties_container_impl::TypedIndex<PropIndex, T>;
   using ColorIndex = TypedIndex<glm::vec4>;
   using FloatIndex = TypedIndex<float>;
 
-  template <typename T, typename Enable = std::enable_if_t<std::is_enum_v<T>>>
-  using EnumIndex = TypedIndex<T>;
-
   ParametersWidget();
 
   void Update();
+
+  // Min filter
+
+  [[nodiscard]] auto MinFilterIdx() const noexcept { return min_filter_; }
+
+  [[nodiscard]] bool MinFilterChanged() const noexcept {
+    return props_data_.PropertyChanged(MinFilterIdx());
+  }
+
+  [[nodiscard]] GlTextureFilter GetMinFilter() const noexcept {
+    return props_data_.GetProperty(MinFilterIdx());
+  }
+
+  // Mag filter
+
+  [[nodiscard]] auto MagFilterIdx() const noexcept { return mag_filter_; }
+
+  [[nodiscard]] bool MagFilterChanged() const noexcept {
+    return props_data_.PropertyChanged(MagFilterIdx());
+  }
+
+  [[nodiscard]] GlTextureFilter GetMagFilter() const noexcept {
+    return props_data_.GetProperty(MagFilterIdx());
+  }
 
   // Point Size Changed
 
@@ -204,6 +229,17 @@ struct ParametersWidget {
     return props_data_.GetProperty(global_color_idx_);
   }
 
+  // Transform
+  [[nodiscard]] auto GetTransformIndex() const noexcept { return transform_; }
+
+  [[nodiscard]] bool TransformChanged() const noexcept {
+    return props_data_.PropertyChanged(GetTransformIndex());
+  }
+
+  [[nodiscard]] const glm::mat4& GetTransform() const noexcept {
+    return props_data_.GetProperty(GetTransformIndex());
+  }
+
   // Border Color
 
   [[nodiscard]] auto GetBorderColorIndex() const noexcept {
@@ -242,7 +278,7 @@ struct ParametersWidget {
 
   // Generic
   template <bool force = false, typename IndexType, typename F>
-  void CheckPropertyChange(IndexType index, F&& function) const noexcept {
+  void OnChange(IndexType index, F&& function) const noexcept {
     if constexpr (!force) {
       [[likely]] if (!props_data_.PropertyChanged(index)) { return; }
     }
@@ -266,15 +302,36 @@ struct ParametersWidget {
                       float min, float max) noexcept {
     auto& value = props_data_.GetProperty(index);
     auto new_value = value;
-    ImGui::DragFloat2(title, &new_value.x, 0.01f, min, max);
+    ImGui::DragScalarN(title, ImGuiDataType_Float, &new_value.x, N, 0.01f, &min,
+                       &max, "%.3f");
     [[unlikely]] if (VectorChanged(new_value, value)) {
       value = new_value;
       props_data_.SetChanged(index, true);
     }
   }
 
-  template <typename T, size_t Extent>
-  void EnumProperty(const char* title, EnumIndex<T> index,
+  template <typename T, int C, int R>
+  void MatrixProperty(TypedIndex<glm::mat<C, R, T>> index, float min,
+                      float max) noexcept {
+    auto& value = props_data_.GetProperty(index);
+    bool changed = false;
+    for (int row_index = 0; row_index < R; ++row_index) {
+      auto row = glm::row(value, row_index);
+      auto new_row = row;
+      ImGui::PushID(row_index);
+      ImGui::DragScalarN("", ImGuiDataType_Float, &new_row.x, C, 0.01f, &min,
+                         &max, "%.3f");
+      ImGui::PopID();
+      [[unlikely]] if (VectorChanged(row, new_row)) {
+        value = glm::row(value, row_index, new_row);
+        changed = true;
+      }
+    }
+    [[unlikely]] if (changed) { props_data_.SetChanged(index, true); }
+  }
+
+  template <Enumeration T, size_t Extent>
+  void EnumProperty(const char* title, TypedIndex<T> index,
                     std::span<std::string, Extent> values) {
     using U = std::underlying_type_t<T>;
     auto& value = props_data_.GetProperty(index);
@@ -302,8 +359,8 @@ struct ParametersWidget {
     }
   }
 
-  template <typename T>
-  [[nodiscard]] T GetEnumProperty(EnumIndex<T> index) const noexcept {
+  template <Enumeration T>
+  [[nodiscard]] T GetEnumProperty(TypedIndex<T> index) const noexcept {
     return static_cast<T>(props_data_.GetProperty(index));
   }
 
@@ -326,8 +383,11 @@ struct ParametersWidget {
       static_cast<size_t>(GlPolygonMode::Max);
   static constexpr size_t kNumTextureWrapModes =
       static_cast<size_t>(GlTextureWrapMode::Max);
-  std::array<std::string, kNumTextureWrapModes> polygon_modes_;
+  static constexpr size_t kNumTextureFilters =
+      static_cast<size_t>(GlTextureFilter::Max);
+  std::array<std::string, kNumPolygonModes> polygon_modes_;
   std::array<std::string, kNumTextureWrapModes> wrap_modes_;
+  std::array<std::string, kNumTextureFilters> tex_filters_;
 
   PropsData props_data_;
   ColorIndex clear_color_idx_;
@@ -336,8 +396,11 @@ struct ParametersWidget {
   FloatIndex line_width_idx_;
   FloatIndex point_size_idx_;
   TypedIndex<glm::vec2> tex_mult_;
-  EnumIndex<GlPolygonMode> polygon_mode_idx_;
-  EnumIndex<GlTextureWrapMode> wrap_mode_s_;
-  EnumIndex<GlTextureWrapMode> wrap_mode_t_;
-  EnumIndex<GlTextureWrapMode> wrap_mode_r_;
+  TypedIndex<GlPolygonMode> polygon_mode_idx_;
+  TypedIndex<GlTextureWrapMode> wrap_mode_s_;
+  TypedIndex<GlTextureWrapMode> wrap_mode_t_;
+  TypedIndex<GlTextureWrapMode> wrap_mode_r_;
+  TypedIndex<glm::mat4> transform_;
+  TypedIndex<GlTextureFilter> min_filter_;
+  TypedIndex<GlTextureFilter> mag_filter_;
 };

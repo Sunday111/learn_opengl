@@ -11,6 +11,9 @@ ParametersWidget::ParametersWidget() {
   props_data_.AddProperty(wrap_mode_t_, GlTextureWrapMode::Repeat);
   props_data_.AddProperty(wrap_mode_r_, GlTextureWrapMode::Repeat);
   props_data_.AddProperty(tex_mult_, {1.0f, 1.0f});
+  props_data_.AddProperty(transform_, glm::mat4(1.0));
+  props_data_.AddProperty(min_filter_, GlTextureFilter::LinearMipmapLinear);
+  props_data_.AddProperty(mag_filter_, GlTextureFilter::Linear);
 
   polygon_modes_[0] = "point";
   polygon_modes_[1] = "line";
@@ -21,6 +24,13 @@ ParametersWidget::ParametersWidget() {
   wrap_modes_[2] = "repeat";
   wrap_modes_[3] = "repeat mirrored";
   wrap_modes_[4] = "mirror clamp to edge";
+
+  tex_filters_[0] = "Nearest";
+  tex_filters_[1] = "Linear";
+  tex_filters_[2] = "NearestMipmapNearest";
+  tex_filters_[3] = "LinearMipmapNearest";
+  tex_filters_[4] = "NearestMipmapLinear";
+  tex_filters_[5] = "LinearMipmapLinear";
 }
 
 void ParametersWidget::Update() {
@@ -33,13 +43,20 @@ void ParametersWidget::Update() {
   ColorProperty("draw color multiplier", global_color_idx_);
   ColorProperty("border color", border_color_idx_);
   PolygonModeWidget();
-  if (ImGui::CollapsingHeader("Texture wrap mode")) {
-    EnumProperty("s", wrap_mode_s_, std::span(wrap_modes_));
-    EnumProperty("t", wrap_mode_t_, std::span(wrap_modes_));
-    EnumProperty("r", wrap_mode_r_, std::span(wrap_modes_));
+  if (ImGui::CollapsingHeader("Texture Sampling")) {
+    EnumProperty("wrap s", wrap_mode_s_, std::span(wrap_modes_));
+    EnumProperty("wrap t", wrap_mode_t_, std::span(wrap_modes_));
+    EnumProperty("wrap r", wrap_mode_r_, std::span(wrap_modes_));
+    EnumProperty("min filter", min_filter_, std::span(tex_filters_));
+    EnumProperty("mag filter", mag_filter_,
+                 std::span(tex_filters_).subspan(0, 2));
   }
   if (ImGui::CollapsingHeader("Texture coordinates multiplication")) {
     VectorProperty("mul", tex_mult_, 0.0f, 10.0f);
+  }
+  if (ImGui::CollapsingHeader("Transform")) {
+    MatrixProperty(transform_, std::numeric_limits<float>::lowest(),
+                   std::numeric_limits<float>::max());
   }
   ImGui::End();
 }

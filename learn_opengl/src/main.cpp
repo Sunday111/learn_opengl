@@ -306,9 +306,7 @@ GLuint LoadTexture(const std::filesystem::path& path) {
 
 template <bool force = false>
 void UpdateProperties(const ParametersWidget& w) noexcept {
-  auto check_prop = [&](auto index, auto fn) {
-    w.CheckPropertyChange<force>(index, fn);
-  };
+  auto check_prop = [&](auto index, auto fn) { w.OnChange<force>(index, fn); };
 
   check_prop(w.GetPolygonModeIndex(), OpenGl::PolygonMode);
   check_prop(w.GetPointSizeIndex(), OpenGl::PointSize);
@@ -325,6 +323,9 @@ void UpdateProperties(const ParametersWidget& w) noexcept {
   check_prop(w.GetTextureWrapModeRIndex(), [](auto mode) {
     OpenGl::SetTexture2dWrap(GlTextureWrap::R, mode);
   });
+
+  check_prop(w.MinFilterIdx(), OpenGl::SetTexture2dMinFilter);
+  check_prop(w.MagFilterIdx(), OpenGl::SetTexture2dMagFilter);
 }
 
 int main(int argc, char** argv) {
@@ -371,6 +372,8 @@ int main(int argc, char** argv) {
         OpenGl::GetUniformLocation(shader_program, "globalColor");
     const ui32 tex_mul_uniform =
         OpenGl::GetUniformLocation(shader_program, "texCoordMultiplier");
+    const ui32 transform_uniform =
+        OpenGl::GetUniformLocation(shader_program, "transform");
     const GLuint texture = LoadTexture(textures_dir / "wall.jpg");
     std::vector<std::unique_ptr<Model>> models =
         MakeTestModels(shader_program, texture);
@@ -379,6 +382,7 @@ int main(int argc, char** argv) {
     OpenGl::UseProgram(shader_program);
     OpenGl::SetUniform(color_uniform, parameters.GetGlobalColor());
     OpenGl::SetUniform(tex_mul_uniform, parameters.GetTexCoordMultiplier());
+    OpenGl::SetUniform(transform_uniform, parameters.GetTransform());
 
     while (!windows.empty()) {
       for (size_t i = 0; i < windows.size();) {
@@ -409,18 +413,21 @@ int main(int argc, char** argv) {
         OpenGl::Viewport(0, 0, static_cast<GLsizei>(window->GetWidth()),
                          static_cast<GLsizei>(window->GetHeight()));
         OpenGl::Clear(GL_COLOR_BUFFER_BIT);
-        parameters.CheckPropertyChange(
-            parameters.GetGlobalColorIndex(), [&](const glm::vec4& color) {
-              OpenGl::SetUniform(color_uniform, color);
-            });
+        parameters.OnChange(parameters.GetGlobalColorIndex(),
+                            [&](const glm::vec4& color) {
+                              OpenGl::SetUniform(color_uniform, color);
+                            });
 
-        parameters.CheckPropertyChange(parameters.GetTexCoordMultiplierIndex(),
-                                       [&](const glm::vec2& color) {
-                                         OpenGl::SetUniform(tex_mul_uniform,
-                                                            color);
-                                       });
-        OpenGl::SetTexture2dMinFilter(GlTextureFilter::LinearMipmapLinear);
-        OpenGl::SetTexture2dMagFilter(GlTextureFilter::Linear);
+        parameters.OnChange(parameters.GetTexCoordMultiplierIndex(),
+                            [&](const glm::vec2& color) {
+                              OpenGl::SetUniform(tex_mul_uniform, color);
+                            });
+
+        parameters.OnChange(parameters.GetTransformIndex(),
+                            [&](const glm::mat4& transform) {
+                              OpenGl::SetUniform(transform_uniform, transform);
+                            });
+
         for (auto& model : models) {
           model->Draw();
         }

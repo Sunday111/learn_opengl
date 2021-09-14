@@ -25,4 +25,6 @@ include_glm_begin;
 #include "glm/vec2.hpp"
 #include "glm/vec3.hpp"
 #include "glm/vec4.hpp"
+#include "glm/gtc/type_ptr.hpp"
+#include "glm/gtc/matrix_access.hpp"
 include_glm_end;
