@@ -14,9 +14,9 @@
 #include "integer.hpp"
 #include "properties_widget.hpp"
 #include "read_file.hpp"
-#include "shader_helper.h"
+#include "shader/shader.hpp"
+#include "shader/shader_manager.hpp"
 #include "template/class_member_traits.hpp"
-#include "unused_var.hpp"
 
 class GlfwState {
  public:
@@ -60,6 +60,9 @@ class Window {
 
   [[nodiscard]] ui32 GetWidth() const noexcept { return width_; }
   [[nodiscard]] ui32 GetHeight() const noexcept { return height_; }
+  [[nodiscard]] float GetAspect() const noexcept {
+    return static_cast<float>(GetWidth()) / static_cast<float>(GetHeight());
+  }
 
   void ProcessInput() {
     if (glfwGetKey(window_, GLFW_KEY_ESCAPE) == GLFW_PRESS)
@@ -129,8 +132,7 @@ int InitializeGLAD_impl() {
 }
 
 void InitializeGLAD() {
-  static int once = InitializeGLAD_impl();
-  UnusedVar(once);
+  [[maybe_unused]] static int once = InitializeGLAD_impl();
 }
 
 class Vertex {
@@ -282,13 +284,6 @@ std::vector<std::unique_ptr<Model>> MakeTestModels(GLuint shader,
   return models;
 }
 
-GLuint CreateTestUnlitShader(const std::filesystem::path& shaders_dir) {
-  ShaderProgramInfo shader_info;
-  shader_info.vertex = shaders_dir / "vertex_shader.vert";
-  shader_info.fragment = shaders_dir / "fragment_shader.frag";
-  return MakeShaderProgram(shader_info);
-}
-
 GLuint LoadTexture(const std::filesystem::path& path) {
   std::string string_path = path.string();
   ImageLoader image(string_path);
@@ -328,9 +323,7 @@ void UpdateProperties(const ParametersWidget& w) noexcept {
   check_prop(w.MagFilterIdx(), OpenGl::SetTexture2dMagFilter);
 }
 
-int main(int argc, char** argv) {
-  UnusedVar(argc);
-
+int main([[maybe_unused]] int argc, char** argv) {
   try {
     const std::filesystem::path exe_file = std::filesystem::path(argv[0]);
     spdlog::set_level(spdlog::level::trace);
@@ -339,6 +332,8 @@ int main(int argc, char** argv) {
     const auto content_dir = exe_file.parent_path() / "content";
     const auto shaders_dir = content_dir / "shaders";
     const auto textures_dir = content_dir / "textures";
+    auto shader_manager =
+        std::make_unique<ShaderManager>(content_dir / "shaders");
 
     GlfwState glfw_state;
     glfw_state.Initialize();
@@ -358,6 +353,7 @@ int main(int argc, char** argv) {
     }
 
     GlDebugMessenger::Start();
+    OpenGl::EnableDepthTest();
 
     glfwSwapInterval(0);
     ImGui::CreateContext();
@@ -366,27 +362,37 @@ int main(int argc, char** argv) {
     ImGui_ImplOpenGL3_Init("#version 130");
 
     ParametersWidget parameters;
-    const GLuint shader_program = CreateTestUnlitShader(shaders_dir);
+    auto shader = shader_manager->LoadShader("simple.shader.json");
 
     const ui32 color_uniform =
-        OpenGl::GetUniformLocation(shader_program, "globalColor");
+        OpenGl::GetUniformLocation(shader->program_, "globalColor");
     const ui32 tex_mul_uniform =
-        OpenGl::GetUniformLocation(shader_program, "texCoordMultiplier");
-    const ui32 transform_uniform =
-        OpenGl::GetUniformLocation(shader_program, "transform");
+        OpenGl::GetUniformLocation(shader->program_, "texCoordMultiplier");
+    const ui32 model_uniform =
+        OpenGl::GetUniformLocation(shader->program_, "model");
+    const ui32 view_uniform =
+        OpenGl::GetUniformLocation(shader->program_, "view");
+    const ui32 projection_uniform =
+        OpenGl::GetUniformLocation(shader->program_, "projection");
     const GLuint texture = LoadTexture(textures_dir / "wall.jpg");
     std::vector<std::unique_ptr<Model>> models =
-        MakeTestModels(shader_program, texture);
+        MakeTestModels(shader->program_, texture);
 
     UpdateProperties<true>(parameters);
-    OpenGl::UseProgram(shader_program);
+    shader->Use();
     OpenGl::SetUniform(color_uniform, parameters.GetGlobalColor());
     OpenGl::SetUniform(tex_mul_uniform, parameters.GetTexCoordMultiplier());
-    OpenGl::SetUniform(transform_uniform, parameters.GetTransform());
+    OpenGl::SetUniform(model_uniform, parameters.GetModelMtx());
+    OpenGl::SetUniform(view_uniform, parameters.GetViewMtx());
+    OpenGl::SetUniform(projection_uniform, parameters.GetProjMtx());
 
     while (!windows.empty()) {
       for (size_t i = 0; i < windows.size();) {
         auto& window = windows[i];
+
+        auto p = glm::perspective(
+            glm::radians(parameters.GetFov()), window->GetAspect(),
+            parameters.GetNearPlane(), parameters.GetFarPlane());
 
         [[unlikely]] if (window->ShouldClose()) {
           auto erase_it = windows.begin();
@@ -412,21 +418,23 @@ int main(int argc, char** argv) {
 
         OpenGl::Viewport(0, 0, static_cast<GLsizei>(window->GetWidth()),
                          static_cast<GLsizei>(window->GetHeight()));
-        OpenGl::Clear(GL_COLOR_BUFFER_BIT);
+        OpenGl::Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         parameters.OnChange(parameters.GetGlobalColorIndex(),
                             [&](const glm::vec4& color) {
                               OpenGl::SetUniform(color_uniform, color);
                             });
-
         parameters.OnChange(parameters.GetTexCoordMultiplierIndex(),
                             [&](const glm::vec2& color) {
                               OpenGl::SetUniform(tex_mul_uniform, color);
                             });
+        parameters.OnChange(parameters.ModelMtxIdx(), [&](const glm::mat4& t) {
+          OpenGl::SetUniform(model_uniform, t);
+        });
+        parameters.OnChange(parameters.ViewMtxIdx(), [&](const glm::mat4& t) {
+          OpenGl::SetUniform(view_uniform, t);
+        });
 
-        parameters.OnChange(parameters.GetTransformIndex(),
-                            [&](const glm::mat4& transform) {
-                              OpenGl::SetUniform(transform_uniform, transform);
-                            });
+        OpenGl::SetUniform(projection_uniform, p);
 
         for (auto& model : models) {
           model->Draw();

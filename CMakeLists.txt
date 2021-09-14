@@ -24,12 +24,13 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/dep/glm)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/dep/glad)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/dep/stb)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/dep/imgui)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/dep/json)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/learn_opengl)
 
 
-# prints all cmake variables
-get_cmake_property(_variableNames VARIABLES)
-list (SORT _variableNames)
-foreach (_variableName ${_variableNames})
-    message("${_variableName}=${${_variableName}}")
-endforeach()
+## prints all cmake variables
+#get_cmake_property(_variableNames VARIABLES)
+#list (SORT _variableNames)
+#foreach (_variableName ${_variableNames})
+#    message("${_variableName}=${${_variableName}}")
+#endforeach()

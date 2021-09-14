@@ -1,10 +1,15 @@
-#pragma once
+#include "shader/shader_manager.hpp"
+
+#include <spdlog/spdlog.h>
 
 #include <array>
 #include <filesystem>
-#include <vector>
+#include <fstream>
 
-#include "gl_api.hpp"
+#include "nlohmann/json.hpp"
+#include "read_file.hpp"
+#include "shader/shader.hpp"
+#include "template/on_scope_leave.hpp"
 
 void CompileShader(GLuint shader, const std::filesystem::path& path) {
   spdlog::info("compiling shader {}", path.stem().string());
@@ -31,14 +36,13 @@ void CompileShader(GLuint shader, const std::filesystem::path& path) {
   }
 }
 
-[[nodiscard]] GLuint MakeShader(GLenum type,
-                                const std::filesystem::path& path) {
+GLuint MakeShader(GLenum type, const std::filesystem::path& path) {
   unsigned int shader = glCreateShader(type);
   CompileShader(shader, path);
   return shader;
 }
 
-[[nodiscard]] GLuint LinkShaders(const std::span<const GLuint>& shaders) {
+GLuint LinkShaders(const std::span<const GLuint>& shaders) {
   GLuint program = glCreateProgram();
   for (auto shader : shaders) {
     glAttachShader(program, shader);
@@ -62,34 +66,43 @@ void CompileShader(GLuint shader, const std::filesystem::path& path) {
       fmt::format("failed to link shaders. Log:\n{}", error_info));
 }
 
-struct ShaderProgramInfo {
-  std::filesystem::path vertex;
-  std::filesystem::path fragment;
-};
+std::shared_ptr<Shader> ShaderManager::LoadShader(const std::string& path) {
+  if (auto shader_iterator = shaders_.find(path);
+      shader_iterator != shaders_.end()) {
+    return shader_iterator->second;
+  }
 
-template <typename Function>
-class OnScopeLeaveHandler {
- public:
-  OnScopeLeaveHandler(Function function) : function_(std::move(function)) {}
-  ~OnScopeLeaveHandler() { function_(); }
+  std::ifstream shader_file(shaders_dir_ / path);
+  nlohmann::json shader_json;
+  shader_file >> shader_json;
 
- private:
-  Function function_;
-};
+  size_t num_compiled = 0;
+  std::array<GLuint, 2> compiled;
+  auto deleter = OnScopeLeave([&]() {
+    for (size_t i = 0; i < num_compiled; ++i) {
+      glDeleteShader(compiled[i]);
+    }
+  });
 
-template <typename Function>
-auto OnScopeLeave(Function&& fn) {
-  return OnScopeLeaveHandler{std::forward<Function>(fn)};
+  auto add_one = [&](GLuint type, const char* json_name) {
+    if (shader_json.contains(json_name)) {
+      compiled[num_compiled] =
+          MakeShader(type, shaders_dir_ / shader_json[json_name]);
+      num_compiled += 1;
+    }
+  };
+
+  add_one(GL_VERTEX_SHADER, "vertex");
+  add_one(GL_FRAGMENT_SHADER, "fragment");
+
+  auto shader_ptr = std::make_shared<Shader>();
+  shader_ptr->program_ =
+      LinkShaders(std::span(compiled).subspan(0, num_compiled));
+  shaders_[path] = shader_ptr;
+  return shader_ptr;
 }
 
-[[nodiscard]] GLuint MakeShaderProgram(const ShaderProgramInfo& info) {
-  GLuint vertex_shader;
-  GLuint fragment_shader;
+ShaderManager::ShaderManager(const std::filesystem::path shaders_dir)
+    : shaders_dir_(shaders_dir) {}
 
-  vertex_shader = MakeShader(GL_VERTEX_SHADER, info.vertex);
-  auto vert_deleter = OnScopeLeave([&]() { glDeleteShader(vertex_shader); });
-  fragment_shader = MakeShader(GL_FRAGMENT_SHADER, info.fragment);
-  auto frag_deleter = OnScopeLeave([&]() { glDeleteShader(fragment_shader); });
-
-  return LinkShaders(std::array{vertex_shader, fragment_shader});
-}
+ShaderManager::~ShaderManager() = default;

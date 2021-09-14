@@ -70,6 +70,7 @@ class OpenGl {
                                   const void* pointer) noexcept;
 
   static void EnableVertexAttribArray(GLuint index) noexcept;
+  static void EnableDepthTest() noexcept;
 
   static void Viewport(GLint x, GLint y, GLsizei width,
                        GLsizei height) noexcept;

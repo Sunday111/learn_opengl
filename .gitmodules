@@ -13,3 +13,6 @@
 [submodule "dep/spdlog"]
 	path = dep/spdlog
 	url = https://github.com/gabime/spdlog
+[submodule "dep/json"]
+	path = dep/json
+	url = https://github.com/nlohmann/json

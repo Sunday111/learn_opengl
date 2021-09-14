@@ -92,7 +92,9 @@
         "xtr1common": "cpp",
         "xtree": "cpp",
         "xutility": "cpp",
-        "future": "cpp"
+        "future": "cpp",
+        "csignal": "cpp",
+        "valarray": "cpp"
     },
     "cmake.generator": "Ninja",
     "editor.formatOnSave": true

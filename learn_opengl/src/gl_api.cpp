@@ -107,6 +107,7 @@ void OpenGl::SetUniform(ui32 location, const glm::mat4& m,
   glUniformMatrix4fv(static_cast<GLint>(location), 1, CastBool(transpose),
                      glm::value_ptr(m));
 }
+void OpenGl::EnableDepthTest() noexcept { glEnable(GL_DEPTH_TEST); }
 
 void OpenGl::SetUniform(ui32 location, const glm::vec4& v) noexcept {
   glUniform4f(static_cast<GLint>(location), v.r, v.g, v.b, v.a);

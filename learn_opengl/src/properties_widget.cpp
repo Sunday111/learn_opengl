@@ -11,9 +11,15 @@ ParametersWidget::ParametersWidget() {
   props_data_.AddProperty(wrap_mode_t_, GlTextureWrapMode::Repeat);
   props_data_.AddProperty(wrap_mode_r_, GlTextureWrapMode::Repeat);
   props_data_.AddProperty(tex_mult_, {1.0f, 1.0f});
-  props_data_.AddProperty(transform_, glm::mat4(1.0));
+  props_data_.AddProperty(model_, glm::mat4(1.0));
+  props_data_.AddProperty(
+      view_, glm::translate(glm::mat4(1.0), glm::vec3(0.0f, 0.0f, -3.0f)));
+  props_data_.AddProperty(proj_, glm::mat4(1.0));
   props_data_.AddProperty(min_filter_, GlTextureFilter::LinearMipmapLinear);
   props_data_.AddProperty(mag_filter_, GlTextureFilter::Linear);
+  props_data_.AddProperty(near_plane_, 0.1f);
+  props_data_.AddProperty(far_plane_, 100.0f);
+  props_data_.AddProperty(fov_, 45.0f);
 
   polygon_modes_[0] = "point";
   polygon_modes_[1] = "line";
@@ -54,9 +60,18 @@ void ParametersWidget::Update() {
   if (ImGui::CollapsingHeader("Texture coordinates multiplication")) {
     VectorProperty("mul", tex_mult_, 0.0f, 10.0f);
   }
-  if (ImGui::CollapsingHeader("Transform")) {
-    MatrixProperty(transform_, std::numeric_limits<float>::lowest(),
-                   std::numeric_limits<float>::max());
+  if (ImGui::CollapsingHeader("Transformations")) {
+    ImGui::Text("model");
+    MatrixProperty("model", model_);
+    ImGui::Separator();
+    ImGui::Text("view");
+    MatrixProperty("view", view_);
+    ImGui::Separator();
+    ImGui::Text("projection");
+    MatrixProperty("proj", proj_);
+    FloatProperty("near plane", near_plane_, 0.0f, 1000.0f);
+    FloatProperty("far plane", far_plane_, 0.0f, 1000.0f);
+    FloatProperty("fov", fov_, 0.1f, 89.0f);
   }
   ImGui::End();
 }

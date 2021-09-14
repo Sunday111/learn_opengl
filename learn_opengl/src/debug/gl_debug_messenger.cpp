@@ -2,7 +2,6 @@
 
 #include "macro.hpp"
 #include "spdlog/spdlog.h"
-#include "unused_var.hpp"
 
 void GlDebugMessenger::Start() {
   glEnable(GL_DEBUG_OUTPUT);
@@ -70,11 +69,11 @@ spdlog::level::level_enum SeverityToLevel(GLenum severity) {
 }
 
 void GlDebugMessenger::DebugProc(GLenum source, GLenum type, GLuint id,
-                                 GLenum severity, GLsizei length,
+                                 GLenum severity,
+                                 [[maybe_unused]] GLsizei length,
                                  const GLchar* message,
-                                 const void* user_param) {
+                                 [[maybe_unused]] const void* user_param) {
   const auto log_level = SeverityToLevel(severity);
   spdlog::log(log_level, "{} {} {}: {}", SourceToString(source),
               TypeToString(type), id, message);
-  UnusedVar(length, user_param);
 }

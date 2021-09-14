@@ -30,6 +30,7 @@ target_link_libraries(${target_name}
 	glm
 	spdlog
 	imgui
+	nlohmann_json::nlohmann_json
 	${OPENGL_LIBRARIES})
 target_compile_definitions(${target_name} PUBLIC
 	-DGLM_FORCE_RADIANS
