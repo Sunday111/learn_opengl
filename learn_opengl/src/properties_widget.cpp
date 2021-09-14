@@ -14,7 +14,6 @@ ParametersWidget::ParametersWidget() {
   props_data_.AddProperty(model_, glm::mat4(1.0));
   props_data_.AddProperty(
       view_, glm::translate(glm::mat4(1.0), glm::vec3(0.0f, 0.0f, -3.0f)));
-  props_data_.AddProperty(proj_, glm::mat4(1.0));
   props_data_.AddProperty(min_filter_, GlTextureFilter::LinearMipmapLinear);
   props_data_.AddProperty(mag_filter_, GlTextureFilter::Linear);
   props_data_.AddProperty(near_plane_, 0.1f);
@@ -68,7 +67,6 @@ void ParametersWidget::Update() {
     MatrixProperty("view", view_);
     ImGui::Separator();
     ImGui::Text("projection");
-    MatrixProperty("proj", proj_);
     FloatProperty("near plane", near_plane_, 0.0f, 1000.0f);
     FloatProperty("far plane", far_plane_, 0.0f, 1000.0f);
     FloatProperty("fov", fov_, 0.1f, 89.0f);

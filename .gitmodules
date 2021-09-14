@@ -16,3 +16,6 @@
 [submodule "dep/json"]
 	path = dep/json
 	url = https://github.com/nlohmann/json
+[submodule "dep/tinyobjloader"]
+	path = dep/tinyobjloader
+	url = https://github.com/tinyobjloader/tinyobjloader

@@ -25,6 +25,7 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/dep/glad)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/dep/stb)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/dep/imgui)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/dep/json)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/dep/tinyobjloader)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/learn_opengl)
 
 

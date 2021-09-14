@@ -286,17 +286,6 @@ struct ParametersWidget {
     return props_data_.GetProperty(ViewMtxIdx());
   }
 
-  // Proj
-  [[nodiscard]] auto ProjMtxIdx() const noexcept { return proj_; }
-
-  [[nodiscard]] bool ViewProjChanged() const noexcept {
-    return props_data_.PropertyChanged(ProjMtxIdx());
-  }
-
-  [[nodiscard]] const glm::mat4& GetProjMtx() const noexcept {
-    return props_data_.GetProperty(ProjMtxIdx());
-  }
-
   // Border Color
 
   [[nodiscard]] auto GetBorderColorIndex() const noexcept {
@@ -499,7 +488,6 @@ struct ParametersWidget {
   TypedIndex<GlTextureWrapMode> wrap_mode_r_;
   TypedIndex<glm::mat4> model_;
   TypedIndex<glm::mat4> view_;
-  TypedIndex<glm::mat4> proj_;
   TypedIndex<GlTextureFilter> min_filter_;
   TypedIndex<GlTextureFilter> mag_filter_;
 };

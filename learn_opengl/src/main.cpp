@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <stdexcept>
+#include <unordered_map>
 #include <vector>
 
 #include "debug/gl_debug_messenger.hpp"
@@ -12,6 +13,7 @@
 #include "include_glm.hpp"
 #include "include_imgui.h"
 #include "integer.hpp"
+#include "model3d.hpp"
 #include "properties_widget.hpp"
 #include "read_file.hpp"
 #include "shader/shader.hpp"
@@ -135,155 +137,6 @@ void InitializeGLAD() {
   [[maybe_unused]] static int once = InitializeGLAD_impl();
 }
 
-class Vertex {
- public:
-  glm::vec3 position;
-  glm::vec2 tex_coord;
-  glm::vec3 color;
-};
-
-template <typename T>
-struct TypeToGlType;
-
-template <>
-struct TypeToGlType<float> {
-  static constexpr size_t Size = 1;
-  static constexpr GLenum Type = GL_FLOAT;
-};
-
-template <typename T, int N>
-struct TypeToGlType<glm::vec<N, T>> {
-  static constexpr size_t Size = static_cast<size_t>(N);
-  static constexpr GLenum Type = TypeToGlType<T>::Type;
-};
-
-template <auto Member>
-[[nodiscard]] size_t MemberOffset() noexcept {
-  using MemberTraits = ClassMemberTraits<decltype(Member)>;
-  using T = typename MemberTraits::Class;
-  auto ptr = &(reinterpret_cast<T const volatile*>(NULL)->*Member);
-  return reinterpret_cast<size_t>(ptr);
-}
-
-class Model {
- public:
-  void Create(const std::span<const Vertex>& vertices,
-              const std::span<const ui32>& indices, GLuint texture) {
-    vao_ = OpenGl::GenVertexArray();
-    vbo_ = OpenGl::GenBuffer();
-    ebo_ = OpenGl::GenBuffer();
-
-    // bind Vertex Array Object
-    OpenGl::BindVertexArray(vao_);
-
-    // copy our vertices array in a buffer for OpenGL to use
-    OpenGl::BindBuffer(GL_ARRAY_BUFFER, vbo_);
-    OpenGl::BufferData(GL_ARRAY_BUFFER, std::span(vertices), GL_STATIC_DRAW);
-
-    // copy index array in a element buffer
-    OpenGl::BindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_);
-    OpenGl::BufferData(GL_ELEMENT_ARRAY_BUFFER, std::span(indices),
-                       GL_STATIC_DRAW);
-
-    GLuint location = 0;
-    RegisterAttribute<&Vertex::position>(location++, false);
-    RegisterAttribute<&Vertex::tex_coord>(location++, false);
-    RegisterAttribute<&Vertex::color>(location++, false);
-
-    texture_ = texture;
-    num_indices_ = indices.size();
-  }
-
-  template <auto MemberVariablePtr>
-  void RegisterAttribute(GLuint location, bool normalized) {
-    using MemberTraits = ClassMemberTraits<decltype(MemberVariablePtr)>;
-    using GlTypeTraits = TypeToGlType<typename MemberTraits::Member>;
-    const size_t vertex_stride = sizeof(typename MemberTraits::Class);
-    const size_t member_stride = MemberOffset<MemberVariablePtr>();
-    OpenGl::VertexAttribPointer(location, GlTypeTraits::Size,
-                                GlTypeTraits::Type, normalized, vertex_stride,
-                                reinterpret_cast<void*>(member_stride));
-    OpenGl::EnableVertexAttribArray(location);
-  }
-
-  void Draw() {
-    OpenGl::UseProgram(shader_);
-    OpenGl::BindVertexArray(vao_);
-    OpenGl::BindTexture2d(texture_);
-    OpenGl::DrawElements(GL_TRIANGLES, num_indices_, GL_UNSIGNED_INT, nullptr);
-  }
-
-  size_t num_indices_ = 0;
-  GLuint shader_;
-  GLuint vao_;  // vertex array object
-  GLuint vbo_;  // vertex buffer object
-  GLuint ebo_;  // element buffer object
-  GLuint texture_ = 0;
-};
-
-std::vector<std::unique_ptr<Model>> MakeTestModels(GLuint shader,
-                                                   GLuint texture) {
-  std::vector<std::unique_ptr<Model>> models;
-
-  size_t rows = 1;
-  size_t columns = 1;
-  float min_coord = -1.0f;
-  float max_coord = 1.0f;
-
-  const float size_factor = 0.85f;
-  const glm::vec2 coord_zero{min_coord, min_coord};
-  const glm::vec2 coord_extent{max_coord - min_coord, max_coord - min_coord};
-  const glm::vec2 sector_size_x{coord_extent.x / static_cast<float>(columns),
-                                0.0f};
-  const glm::vec2 sector_size_y{0.0f,
-                                coord_extent.y / static_cast<float>(rows)};
-  const glm::vec2 sector_size = (sector_size_x + sector_size_y);
-  const glm::vec2 square_size = sector_size * size_factor;
-
-  for (size_t row = 0; row < rows; ++row) {
-    for (size_t column = 0; column < columns; ++column) {
-      const glm::vec2 offset{sector_size_x * static_cast<float>(column) +
-                             sector_size_y * static_cast<float>(row)};
-
-      const glm::vec2 top_left =
-          coord_zero + offset + (1.0f - size_factor) * 0.5f * sector_size;
-      const glm::vec2 bot_right = top_left + square_size;
-
-      std::array<Vertex, 4> v;
-
-      // top right
-      v[0].position = {bot_right.x, top_left.y, 0.0f};
-      v[0].color = {1.0f, 1.0f, 1.0f};
-      v[0].tex_coord = {1.0f, 1.0f};
-
-      // bottom right
-      v[1].position = {bot_right.x, bot_right.y, 0.0f};
-      v[1].color = {1.0f, 1.0f, 1.0f};
-      v[1].tex_coord = {1.0f, 0.0f};
-
-      // bottom left
-      v[2].position = {top_left.x, bot_right.y, 0.0f};
-      v[2].color = {1.0f, 1.0f, 1.0f};
-      v[2].tex_coord = {0.0f, 0.0f};
-
-      // top left
-      v[3].position = {top_left.x, top_left.y, 0.0f};
-      v[3].color = {1.0f, 1.0f, 1.0f};
-      v[3].tex_coord = {0.0f, 1.0f};
-
-      std::array<ui32, 6> indices = {
-          0, 1, 3,  // first triangle
-          1, 2, 3   // second triangle
-      };
-
-      models.push_back(std::make_unique<Model>());
-      models.back()->shader_ = shader;
-      models.back()->Create(v, indices, texture);
-    }
-  }
-  return models;
-}
-
 GLuint LoadTexture(const std::filesystem::path& path) {
   std::string string_path = path.string();
   ImageLoader image(string_path);
@@ -332,6 +185,7 @@ int main([[maybe_unused]] int argc, char** argv) {
     const auto content_dir = exe_file.parent_path() / "content";
     const auto shaders_dir = content_dir / "shaders";
     const auto textures_dir = content_dir / "textures";
+    const auto models_dir = content_dir / "models";
     auto shader_manager =
         std::make_unique<ShaderManager>(content_dir / "shaders");
 
@@ -363,20 +217,18 @@ int main([[maybe_unused]] int argc, char** argv) {
 
     ParametersWidget parameters;
     auto shader = shader_manager->LoadShader("simple.shader.json");
-
-    const ui32 color_uniform =
-        OpenGl::GetUniformLocation(shader->program_, "globalColor");
+    const ui32 color_uniform = shader->GetUniformLocation("globalColor");
     const ui32 tex_mul_uniform =
-        OpenGl::GetUniformLocation(shader->program_, "texCoordMultiplier");
-    const ui32 model_uniform =
-        OpenGl::GetUniformLocation(shader->program_, "model");
-    const ui32 view_uniform =
-        OpenGl::GetUniformLocation(shader->program_, "view");
-    const ui32 projection_uniform =
-        OpenGl::GetUniformLocation(shader->program_, "projection");
-    const GLuint texture = LoadTexture(textures_dir / "wall.jpg");
-    std::vector<std::unique_ptr<Model>> models =
-        MakeTestModels(shader->program_, texture);
+        shader->GetUniformLocation("texCoordMultiplier");
+    const ui32 model_uniform = shader->GetUniformLocation("model");
+    const ui32 view_uniform = shader->GetUniformLocation("view");
+    const ui32 projection_uniform = shader->GetUniformLocation("projection");
+    const GLuint texture = LoadTexture(textures_dir / "viking_room.png");
+
+    std::vector<std::unique_ptr<Model3d>> models;
+    models.push_back(std::make_unique<Model3d>());
+    models.back()->Create((models_dir / "viking_room.obj").string(), texture,
+                          shader);
 
     UpdateProperties<true>(parameters);
     shader->Use();
@@ -384,7 +236,6 @@ int main([[maybe_unused]] int argc, char** argv) {
     OpenGl::SetUniform(tex_mul_uniform, parameters.GetTexCoordMultiplier());
     OpenGl::SetUniform(model_uniform, parameters.GetModelMtx());
     OpenGl::SetUniform(view_uniform, parameters.GetViewMtx());
-    OpenGl::SetUniform(projection_uniform, parameters.GetProjMtx());
 
     while (!windows.empty()) {
       for (size_t i = 0; i < windows.size();) {
@@ -437,6 +288,10 @@ int main([[maybe_unused]] int argc, char** argv) {
         OpenGl::SetUniform(projection_uniform, p);
 
         for (auto& model : models) {
+          auto view = glm::lookAt(glm::vec3(3.0f, 3.0f, 3.0f),
+                                  glm::vec3(0.0f, 0.0f, 0.0f),
+                                  glm::vec3(0.0f, 0.0f, 1.0f));
+          OpenGl::SetUniform(view_uniform, view);
           model->Draw();
         }
         OpenGl::BindVertexArray(0);

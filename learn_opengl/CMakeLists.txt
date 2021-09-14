@@ -30,12 +30,14 @@ target_link_libraries(${target_name}
 	glm
 	spdlog
 	imgui
+	tinyobjloader
 	nlohmann_json::nlohmann_json
 	${OPENGL_LIBRARIES})
 target_compile_definitions(${target_name} PUBLIC
 	-DGLM_FORCE_RADIANS
 	-DTINYOBJLOADER_IMPLEMENTATION
-	-DSPDLOG_FMT_EXTERNAL)
+	-DSPDLOG_FMT_EXTERNAL
+	-DTINYOBJLOADER_IMPLEMENTATION)
 target_include_directories(${target_name} PUBLIC ${target_src_root})
 
 if(MSVC)
