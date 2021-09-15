@@ -54,13 +54,13 @@ struct PropertiesContainer {
   }
 
   template <typename T>
-  [[nodiscard]] bool PropertyChanged(
+  [[nodiscard]] bool IsPropertyChanged(
       const TypedIndex<Index, T>& index) const noexcept {
-    return PropertyChanged<T>(index.index);
+    return IsPropertyChanged<T>(index.index);
   }
 
   template <typename T>
-  [[nodiscard]] bool PropertyChanged(Index index) const noexcept {
+  [[nodiscard]] bool IsPropertyChanged(Index index) const noexcept {
     return GetTypeStorage<T>().changed[index];
   }
 
@@ -135,21 +135,19 @@ class ProgramProperties {
   ProgramProperties();
 
   [[nodiscard]] bool Changed(auto index) const {
-    return props_data_.PropertyChanged(index);
+    return props_data_.IsPropertyChanged(index);
   }
 
-  [[nodiscard]] auto& GetProperty(auto index) {
-    return props_data_.GetProperty(index);
-  }
+  [[nodiscard]] auto& Get(auto index) { return props_data_.GetProperty(index); }
 
-  [[nodiscard]] const auto& GetProperty(auto index) const {
+  [[nodiscard]] const auto& Get(auto index) const {
     return props_data_.GetProperty(index);
   }
 
   template <bool force = false, typename IndexType, typename F>
   void OnChange(IndexType index, F&& function) const noexcept {
     if constexpr (!force) {
-      [[likely]] if (!props_data_.PropertyChanged(index)) { return; }
+      [[likely]] if (!props_data_.IsPropertyChanged(index)) { return; }
     }
 
     function(props_data_.GetProperty(index));
@@ -238,11 +236,11 @@ struct ParametersWidget {
                       ProgramProperties::TypedIndex<glm::vec<N, T>> index,
                       T min = std::numeric_limits<T>::lowest(),
                       T max = std::numeric_limits<T>::max()) noexcept {
-    auto& value = properties_->GetProperty(index);
+    auto& value = Get(index);
     [[unlikely]] if (ImGui::DragScalarN(title, CastDataType<T>(),
                                         glm::value_ptr(value), N, 0.01f, &min,
                                         &max, "%.3f")) {
-      properties_->MarkChanged(index, true);
+      MarkChanged(index);
     }
   }
 
@@ -252,7 +250,7 @@ struct ParametersWidget {
                       T min = std::numeric_limits<T>::lowest(),
                       T max = std::numeric_limits<T>::max()) noexcept {
     ImGui::PushID(ppp);
-    auto& value = properties_->GetProperty(index);
+    auto& value = Get(index);
     bool changed = false;
     for (int row_index = 0; row_index < R; ++row_index) {
       auto row = glm::row(value, row_index);
@@ -266,7 +264,7 @@ struct ParametersWidget {
         changed = true;
       }
     }
-    [[unlikely]] if (changed) { properties_->MarkChanged(index, true); }
+    [[unlikely]] if (changed) { MarkChanged(index); }
     ImGui::PopID();
   }
 
@@ -274,7 +272,7 @@ struct ParametersWidget {
   void EnumProperty(const char* title, ProgramProperties::TypedIndex<T> index,
                     std::span<std::string, Extent> values) {
     using U = std::underlying_type_t<T>;
-    auto& value = properties_->GetProperty(index);
+    auto& value = Get(index);
     auto new_value = static_cast<U>(value);
 
     const char* selected_item = values[new_value].data();
@@ -295,14 +293,8 @@ struct ParametersWidget {
 
     [[unlikely]] if (value != static_cast<T>(new_value)) {
       value = static_cast<T>(new_value);
-      properties_->MarkChanged(index, true);
+      MarkChanged(index);
     }
-  }
-
-  template <Enumeration T>
-  [[nodiscard]] T GetEnumProperty(
-      ProgramProperties::TypedIndex<T> index) const noexcept {
-    return static_cast<T>(properties_->GetProperty(index));
   }
 
   template <typename T, int N>
@@ -317,6 +309,18 @@ struct ParametersWidget {
 
   [[nodiscard]] static bool FloatChanged(float a, float b) noexcept {
     return std::abs(a - b) > 0.0001f;
+  }
+
+  [[nodiscard]] bool Changed(auto index) const {
+    return properties_->Changed(index);
+  }
+
+  void MarkChanged(auto index) const { properties_->MarkChanged(index, true); }
+
+  [[nodiscard]] auto& Get(auto index) { return properties_->Get(index); }
+
+  [[nodiscard]] const auto& Get(auto index) const {
+    return properties_->Get(index);
   }
 
  private:

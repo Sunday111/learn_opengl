@@ -78,24 +78,24 @@ void ParametersWidget::Update() {
 
 void ParametersWidget::ColorProperty(
     const char* title, ProgramProperties::ColorIndex index) noexcept {
-  auto& value = properties_->GetProperty(index);
+  auto& value = Get(index);
   auto new_value = value;
   ImGui::ColorEdit3(title, reinterpret_cast<float*>(&new_value));
   [[unlikely]] if (VectorChanged(new_value, value)) {
     value = new_value;
-    properties_->MarkChanged(index, true);
+    MarkChanged(index);
   }
 }
 
 void ParametersWidget::FloatProperty(const char* title,
                                      ProgramProperties::FloatIndex index,
                                      float min, float max) noexcept {
-  auto& value = properties_->GetProperty(index);
+  auto& value = Get(index);
   auto new_value = value;
   ImGui::SliderFloat(title, &new_value, min, max);
   [[unlikely]] if (FloatChanged(new_value, value)) {
     value = new_value;
-    properties_->MarkChanged(index, true);
+    MarkChanged(index);
   }
 }
 
@@ -103,8 +103,7 @@ void ParametersWidget::PolygonModeWidget() {
   if (ImGui::CollapsingHeader("Polygon Mode")) {
     EnumProperty("mode", properties_->polygon_mode, std::span(polygon_modes_));
 
-    const GlPolygonMode mode =
-        properties_->GetProperty(properties_->polygon_mode);
+    const GlPolygonMode mode = Get(properties_->polygon_mode);
     if (mode == GlPolygonMode::Point) {
       FloatProperty("Point diameter", properties_->point_size, 1.0f, 100.0f);
     } else if (mode == GlPolygonMode::Line) {

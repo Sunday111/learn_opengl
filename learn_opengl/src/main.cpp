@@ -233,16 +233,13 @@ int main([[maybe_unused]] int argc, char** argv) {
 
     UpdateProperties<true>(properties);
     shader->Use();
-    OpenGl::SetUniform(color_uniform,
-                       properties.GetProperty(properties.global_color));
-    OpenGl::SetUniform(tex_mul_uniform,
-                       properties.GetProperty(properties.tex_mult));
+    OpenGl::SetUniform(color_uniform, properties.Get(properties.global_color));
+    OpenGl::SetUniform(tex_mul_uniform, properties.Get(properties.tex_mult));
 
     auto force_update_view_matrix = [&]() {
-      auto view_matrix =
-          glm::lookAt(properties.GetProperty(properties.eye),
-                      properties.GetProperty(properties.look_at),
-                      properties.GetProperty(properties.camera_up));
+      auto view_matrix = glm::lookAt(properties.Get(properties.eye),
+                                     properties.Get(properties.look_at),
+                                     properties.Get(properties.camera_up));
       OpenGl::SetUniform(view_uniform, view_matrix);
     };
 
@@ -260,10 +257,10 @@ int main([[maybe_unused]] int argc, char** argv) {
       for (size_t i = 0; i < windows.size();) {
         auto& window = windows[i];
 
-        auto p = glm::perspective(
-            glm::radians(properties.GetProperty(properties.fov)),
-            window->GetAspect(), properties.GetProperty(properties.near_plane),
-            properties.GetProperty(properties.far_plane));
+        auto p = glm::perspective(glm::radians(properties.Get(properties.fov)),
+                                  window->GetAspect(),
+                                  properties.Get(properties.near_plane),
+                                  properties.Get(properties.far_plane));
 
         [[unlikely]] if (window->ShouldClose()) {
           auto erase_it = windows.begin();
