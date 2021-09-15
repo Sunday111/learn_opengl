@@ -1,6 +1,7 @@
-# vulkan_tutorial
+# learn_opengl
 
-https://vulkan-tutorial.com/
+https://learnopengl.com/
+
 
 Uses git submodules so need to init and update them before calling cmake.
 ```
