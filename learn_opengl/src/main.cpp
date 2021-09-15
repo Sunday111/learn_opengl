@@ -153,27 +153,27 @@ GLuint LoadTexture(const std::filesystem::path& path) {
 }
 
 template <bool force = false>
-void UpdateProperties(const ParametersWidget& w) noexcept {
-  auto check_prop = [&](auto index, auto fn) { w.OnChange<force>(index, fn); };
+void UpdateProperties(const ProgramProperties& p) noexcept {
+  auto check_prop = [&](auto index, auto fn) { p.OnChange<force>(index, fn); };
 
-  check_prop(w.GetPolygonModeIndex(), OpenGl::PolygonMode);
-  check_prop(w.GetPointSizeIndex(), OpenGl::PointSize);
-  check_prop(w.GetLineWidthIndex(), OpenGl::LineWidth);
-  check_prop(w.GetBorderColorIndex(), OpenGl::SetTexture2dBorderColor);
-  check_prop(w.GetClearColorIndex(),
+  check_prop(p.polygon_mode, OpenGl::PolygonMode);
+  check_prop(p.point_size, OpenGl::PointSize);
+  check_prop(p.line_width, OpenGl::LineWidth);
+  check_prop(p.tex_border_color, OpenGl::SetTexture2dBorderColor);
+  check_prop(p.clear_color,
              [](auto clear_color) { OpenGl::SetClearColor(clear_color); });
-  check_prop(w.GetTextureWrapModeSIndex(), [](auto mode) {
+  check_prop(p.wrap_mode_s, [](auto mode) {
     OpenGl::SetTexture2dWrap(GlTextureWrap::S, mode);
   });
-  check_prop(w.GetTextureWrapModeTIndex(), [](auto mode) {
+  check_prop(p.wrap_mode_t, [](auto mode) {
     OpenGl::SetTexture2dWrap(GlTextureWrap::T, mode);
   });
-  check_prop(w.GetTextureWrapModeRIndex(), [](auto mode) {
+  check_prop(p.wrap_mode_r, [](auto mode) {
     OpenGl::SetTexture2dWrap(GlTextureWrap::R, mode);
   });
 
-  check_prop(w.MinFilterIdx(), OpenGl::SetTexture2dMinFilter);
-  check_prop(w.MagFilterIdx(), OpenGl::SetTexture2dMagFilter);
+  check_prop(p.min_filter, OpenGl::SetTexture2dMinFilter);
+  check_prop(p.mag_filter, OpenGl::SetTexture2dMagFilter);
 }
 
 int main([[maybe_unused]] int argc, char** argv) {
@@ -215,7 +215,8 @@ int main([[maybe_unused]] int argc, char** argv) {
     ImGui_ImplGlfw_InitForOpenGL(windows.back()->GetGlfwWindow(), true);
     ImGui_ImplOpenGL3_Init("#version 130");
 
-    ParametersWidget parameters;
+    ProgramProperties properties;
+    ParametersWidget widget(&properties);
     auto shader = shader_manager->LoadShader("simple.shader.json");
     const ui32 color_uniform = shader->GetUniformLocation("globalColor");
     const ui32 tex_mul_uniform =
@@ -230,20 +231,39 @@ int main([[maybe_unused]] int argc, char** argv) {
     models.back()->Create((models_dir / "viking_room.obj").string(), texture,
                           shader);
 
-    UpdateProperties<true>(parameters);
+    UpdateProperties<true>(properties);
     shader->Use();
-    OpenGl::SetUniform(color_uniform, parameters.GetGlobalColor());
-    OpenGl::SetUniform(tex_mul_uniform, parameters.GetTexCoordMultiplier());
-    OpenGl::SetUniform(model_uniform, parameters.GetModelMtx());
-    OpenGl::SetUniform(view_uniform, parameters.GetViewMtx());
+    OpenGl::SetUniform(color_uniform,
+                       properties.GetProperty(properties.global_color));
+    OpenGl::SetUniform(tex_mul_uniform,
+                       properties.GetProperty(properties.tex_mult));
+
+    auto force_update_view_matrix = [&]() {
+      auto view_matrix =
+          glm::lookAt(properties.GetProperty(properties.eye),
+                      properties.GetProperty(properties.look_at),
+                      properties.GetProperty(properties.camera_up));
+      OpenGl::SetUniform(view_uniform, view_matrix);
+    };
+
+    auto update_view_matrix = [&]() {
+      [[unlikely]] if (properties.Changed(properties.eye) ||
+                       properties.Changed(properties.look_at) ||
+                       properties.Changed(properties.camera_up)) {
+        force_update_view_matrix();
+      }
+    };
+
+    force_update_view_matrix();
 
     while (!windows.empty()) {
       for (size_t i = 0; i < windows.size();) {
         auto& window = windows[i];
 
         auto p = glm::perspective(
-            glm::radians(parameters.GetFov()), window->GetAspect(),
-            parameters.GetNearPlane(), parameters.GetFarPlane());
+            glm::radians(properties.GetProperty(properties.fov)),
+            window->GetAspect(), properties.GetProperty(properties.near_plane),
+            properties.GetProperty(properties.far_plane));
 
         [[unlikely]] if (window->ShouldClose()) {
           auto erase_it = windows.begin();
@@ -259,10 +279,11 @@ int main([[maybe_unused]] int argc, char** argv) {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        parameters.Update();
+        properties.MarkAllChanged(false);
+        widget.Update();
         // ImGui::ShowDemoWindow();
 
-        UpdateProperties(parameters);
+        UpdateProperties(properties);
 
         // Rendering
         ImGui::Render();
@@ -270,28 +291,24 @@ int main([[maybe_unused]] int argc, char** argv) {
         OpenGl::Viewport(0, 0, static_cast<GLsizei>(window->GetWidth()),
                          static_cast<GLsizei>(window->GetHeight()));
         OpenGl::Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        parameters.OnChange(parameters.GetGlobalColorIndex(),
+        properties.OnChange(properties.global_color,
                             [&](const glm::vec4& color) {
                               OpenGl::SetUniform(color_uniform, color);
                             });
-        parameters.OnChange(parameters.GetTexCoordMultiplierIndex(),
-                            [&](const glm::vec2& color) {
-                              OpenGl::SetUniform(tex_mul_uniform, color);
-                            });
-        parameters.OnChange(parameters.ModelMtxIdx(), [&](const glm::mat4& t) {
-          OpenGl::SetUniform(model_uniform, t);
+        properties.OnChange(properties.tex_mult, [&](const glm::vec2& color) {
+          OpenGl::SetUniform(tex_mul_uniform, color);
         });
-        parameters.OnChange(parameters.ViewMtxIdx(), [&](const glm::mat4& t) {
-          OpenGl::SetUniform(view_uniform, t);
-        });
+
+        update_view_matrix();
 
         OpenGl::SetUniform(projection_uniform, p);
 
         for (auto& model : models) {
-          auto view = glm::lookAt(glm::vec3(3.0f, 3.0f, 3.0f),
-                                  glm::vec3(0.0f, 0.0f, 0.0f),
-                                  glm::vec3(0.0f, 0.0f, 1.0f));
-          OpenGl::SetUniform(view_uniform, view);
+          float time = static_cast<float>(glfwGetTime());
+          float angle = std::sin(time) * glm::radians(90.0f);
+          auto model_matrix =
+              glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0.0f, 0.0f, 1.0f));
+          OpenGl::SetUniform(model_uniform, model_matrix);
           model->Draw();
         }
         OpenGl::BindVertexArray(0);

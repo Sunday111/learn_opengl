@@ -119,210 +119,33 @@ struct PropertiesContainer {
 };
 }  // namespace properties_container_impl
 
-struct ParametersWidget {
+class ProgramProperties {
+ public:
   using PropIndex = ui8;
   using PropsData = properties_container_impl::PropertiesContainer<
       PropIndex, float, bool, GlTextureWrapMode, GlTextureFilter, GlPolygonMode,
-      glm::vec2, glm::vec4, glm::mat4>;
+      glm::vec2, glm::vec3, glm::vec4, glm::mat4>;
 
   template <typename T>
   using TypedIndex = properties_container_impl::TypedIndex<PropIndex, T>;
   using ColorIndex = TypedIndex<glm::vec4>;
   using FloatIndex = TypedIndex<float>;
 
-  ParametersWidget();
+ public:
+  ProgramProperties();
 
-  void Update();
-
-  // Near plane
-
-  [[nodiscard]] auto NearPlaneIdx() const noexcept { return near_plane_; }
-
-  [[nodiscard]] bool NearPlaneChanged() const noexcept {
-    return props_data_.PropertyChanged(NearPlaneIdx());
+  [[nodiscard]] bool Changed(auto index) const {
+    return props_data_.PropertyChanged(index);
   }
 
-  [[nodiscard]] float GetNearPlane() const noexcept {
-    return props_data_.GetProperty(NearPlaneIdx());
+  [[nodiscard]] auto& GetProperty(auto index) {
+    return props_data_.GetProperty(index);
   }
 
-  // Far plane
-
-  [[nodiscard]] auto FarPlaneIdx() const noexcept { return far_plane_; }
-
-  [[nodiscard]] bool FarPlaneChanged() const noexcept {
-    return props_data_.PropertyChanged(FarPlaneIdx());
+  [[nodiscard]] const auto& GetProperty(auto index) const {
+    return props_data_.GetProperty(index);
   }
 
-  [[nodiscard]] float GetFarPlane() const noexcept {
-    return props_data_.GetProperty(FarPlaneIdx());
-  }
-
-  // FOV
-
-  [[nodiscard]] auto FovIdx() const noexcept { return fov_; }
-
-  [[nodiscard]] bool FovChanged() const noexcept {
-    return props_data_.PropertyChanged(FovIdx());
-  }
-
-  [[nodiscard]] float GetFov() const noexcept {
-    return props_data_.GetProperty(FovIdx());
-  }
-
-  // Min filter
-
-  [[nodiscard]] auto MinFilterIdx() const noexcept { return min_filter_; }
-
-  [[nodiscard]] bool MinFilterChanged() const noexcept {
-    return props_data_.PropertyChanged(MinFilterIdx());
-  }
-
-  [[nodiscard]] GlTextureFilter GetMinFilter() const noexcept {
-    return props_data_.GetProperty(MinFilterIdx());
-  }
-
-  // Mag filter
-
-  [[nodiscard]] auto MagFilterIdx() const noexcept { return mag_filter_; }
-
-  [[nodiscard]] bool MagFilterChanged() const noexcept {
-    return props_data_.PropertyChanged(MagFilterIdx());
-  }
-
-  [[nodiscard]] GlTextureFilter GetMagFilter() const noexcept {
-    return props_data_.GetProperty(MagFilterIdx());
-  }
-
-  // Point Size Changed
-
-  [[nodiscard]] auto GetPointSizeIndex() const noexcept {
-    return point_size_idx_;
-  }
-
-  [[nodiscard]] bool PointSizeChanged() const noexcept {
-    return props_data_.PropertyChanged(point_size_idx_);
-  }
-
-  [[nodiscard]] float GetPointSize() const noexcept {
-    return props_data_.GetProperty(point_size_idx_);
-  }
-
-  // Line Width
-
-  [[nodiscard]] auto GetLineWidthIndex() const noexcept {
-    return line_width_idx_;
-  }
-
-  [[nodiscard]] bool LineWidthChanged() const noexcept {
-    return props_data_.PropertyChanged(line_width_idx_);
-  }
-
-  [[nodiscard]] float GetLineWidth() const noexcept {
-    return props_data_.GetProperty(line_width_idx_);
-  }
-
-  // Polygon Mode
-
-  [[nodiscard]] auto GetPolygonModeIndex() const noexcept {
-    return polygon_mode_idx_;
-  }
-
-  [[nodiscard]] bool PolygonModeChanged() const noexcept {
-    return props_data_.PropertyChanged(polygon_mode_idx_);
-  }
-
-  [[nodiscard]] GlPolygonMode GetPolygonMode() const noexcept {
-    return GetEnumProperty<GlPolygonMode>(polygon_mode_idx_);
-  }
-
-  // Clear Color
-
-  [[nodiscard]] auto GetClearColorIndex() const noexcept {
-    return clear_color_idx_;
-  }
-
-  [[nodiscard]] bool ClearColorChanged() const noexcept {
-    return props_data_.PropertyChanged(clear_color_idx_);
-  }
-
-  [[nodiscard]] const glm::vec4& GetClearColor() const noexcept {
-    return props_data_.GetProperty(clear_color_idx_);
-  }
-
-  // Global Color
-
-  [[nodiscard]] auto GetGlobalColorIndex() const noexcept {
-    return global_color_idx_;
-  }
-
-  [[nodiscard]] bool GlobalColorChanged() const noexcept {
-    return props_data_.PropertyChanged(global_color_idx_);
-  }
-
-  [[nodiscard]] const glm::vec4& GetGlobalColor() const noexcept {
-    return props_data_.GetProperty(global_color_idx_);
-  }
-
-  // Model
-  [[nodiscard]] auto ModelMtxIdx() const noexcept { return model_; }
-
-  [[nodiscard]] bool ModelMtxChanged() const noexcept {
-    return props_data_.PropertyChanged(ModelMtxIdx());
-  }
-
-  [[nodiscard]] const glm::mat4& GetModelMtx() const noexcept {
-    return props_data_.GetProperty(ModelMtxIdx());
-  }
-
-  // View
-  [[nodiscard]] auto ViewMtxIdx() const noexcept { return view_; }
-
-  [[nodiscard]] bool ViewMtxChanged() const noexcept {
-    return props_data_.PropertyChanged(ViewMtxIdx());
-  }
-
-  [[nodiscard]] const glm::mat4& GetViewMtx() const noexcept {
-    return props_data_.GetProperty(ViewMtxIdx());
-  }
-
-  // Border Color
-
-  [[nodiscard]] auto GetBorderColorIndex() const noexcept {
-    return border_color_idx_;
-  }
-
-  [[nodiscard]] bool BorderColorChanged() const noexcept {
-    return props_data_.PropertyChanged(GetBorderColorIndex());
-  }
-
-  [[nodiscard]] const glm::vec4& GetBorderColor() const noexcept {
-    return props_data_.GetProperty(GetBorderColorIndex());
-  }
-
-  // Get texture coordinate multiplier
-  [[nodiscard]] glm::vec2 GetTexCoordMultiplier() const noexcept {
-    return props_data_.GetProperty(tex_mult_);
-  }
-
-  [[nodiscard]] auto GetTexCoordMultiplierIndex() const noexcept {
-    return tex_mult_;
-  }
-
-  // Get wrap mode
-  [[nodiscard]] auto GetTextureWrapModeSIndex() const noexcept {
-    return wrap_mode_s_;
-  }
-
-  [[nodiscard]] auto GetTextureWrapModeTIndex() const noexcept {
-    return wrap_mode_t_;
-  }
-
-  [[nodiscard]] auto GetTextureWrapModeRIndex() const noexcept {
-    return wrap_mode_r_;
-  }
-
-  // Generic
   template <bool force = false, typename IndexType, typename F>
   void OnChange(IndexType index, F&& function) const noexcept {
     if constexpr (!force) {
@@ -332,16 +155,47 @@ struct ParametersWidget {
     function(props_data_.GetProperty(index));
   }
 
-  template <typename IndexType>
-  auto GetProperty(IndexType index) const noexcept {
-    return props_data_.GetProperty(index);
+  void MarkChanged(auto index, bool changed) {
+    props_data_.SetChanged(index, changed);
   }
+  void MarkAllChanged(bool changed) { props_data_.SetAllFlags(changed); }
+
+  ColorIndex clear_color;
+  ColorIndex global_color;
+  ColorIndex tex_border_color;
+  FloatIndex line_width;
+  FloatIndex point_size;
+  FloatIndex near_plane;
+  FloatIndex far_plane;
+  FloatIndex fov;
+  TypedIndex<glm::vec2> tex_mult;
+  TypedIndex<GlPolygonMode> polygon_mode;
+  TypedIndex<GlTextureWrapMode> wrap_mode_s;
+  TypedIndex<GlTextureWrapMode> wrap_mode_t;
+  TypedIndex<GlTextureWrapMode> wrap_mode_r;
+  TypedIndex<GlTextureFilter> min_filter;
+  TypedIndex<GlTextureFilter> mag_filter;
+
+  // Camera
+  TypedIndex<glm::vec3> eye;
+  TypedIndex<glm::vec3> look_at;
+  TypedIndex<glm::vec3> camera_up;
+
+ private:
+  PropsData props_data_;
+};
+
+struct ParametersWidget {
+  ParametersWidget(ProgramProperties* properties);
+
+  void Update();
 
  private:
   void PolygonModeWidget();
-  void ColorProperty(const char* title, ColorIndex index) noexcept;
-  void FloatProperty(const char* title, FloatIndex index, float min,
-                     float max) noexcept;
+  void ColorProperty(const char* title,
+                     ProgramProperties::ColorIndex index) noexcept;
+  void FloatProperty(const char* title, ProgramProperties::FloatIndex index,
+                     float min, float max) noexcept;
 
   template <typename T>
   static constexpr ImGuiDataType_ CastDataType() noexcept {
@@ -380,22 +234,25 @@ struct ParametersWidget {
   }
 
   template <typename T, int N>
-  void VectorProperty(const char* title, TypedIndex<glm::vec<N, T>> index,
-                      float min, float max) noexcept {
-    auto& value = props_data_.GetProperty(index);
+  void VectorProperty(const char* title,
+                      ProgramProperties::TypedIndex<glm::vec<N, T>> index,
+                      T min = std::numeric_limits<T>::lowest(),
+                      T max = std::numeric_limits<T>::max()) noexcept {
+    auto& value = properties_->GetProperty(index);
     [[unlikely]] if (ImGui::DragScalarN(title, CastDataType<T>(),
                                         glm::value_ptr(value), N, 0.01f, &min,
                                         &max, "%.3f")) {
-      props_data_.SetChanged(index, true);
+      properties_->MarkChanged(index, true);
     }
   }
 
   template <typename T, int C, int R>
-  void MatrixProperty(const char* ppp, TypedIndex<glm::mat<C, R, T>> index,
+  void MatrixProperty(const char* ppp,
+                      ProgramProperties::TypedIndex<glm::mat<C, R, T>> index,
                       T min = std::numeric_limits<T>::lowest(),
                       T max = std::numeric_limits<T>::max()) noexcept {
     ImGui::PushID(ppp);
-    auto& value = props_data_.GetProperty(index);
+    auto& value = properties_->GetProperty(index);
     bool changed = false;
     for (int row_index = 0; row_index < R; ++row_index) {
       auto row = glm::row(value, row_index);
@@ -409,15 +266,15 @@ struct ParametersWidget {
         changed = true;
       }
     }
-    [[unlikely]] if (changed) { props_data_.SetChanged(index, true); }
+    [[unlikely]] if (changed) { properties_->MarkChanged(index, true); }
     ImGui::PopID();
   }
 
   template <Enumeration T, size_t Extent>
-  void EnumProperty(const char* title, TypedIndex<T> index,
+  void EnumProperty(const char* title, ProgramProperties::TypedIndex<T> index,
                     std::span<std::string, Extent> values) {
     using U = std::underlying_type_t<T>;
-    auto& value = props_data_.GetProperty(index);
+    auto& value = properties_->GetProperty(index);
     auto new_value = static_cast<U>(value);
 
     const char* selected_item = values[new_value].data();
@@ -438,13 +295,14 @@ struct ParametersWidget {
 
     [[unlikely]] if (value != static_cast<T>(new_value)) {
       value = static_cast<T>(new_value);
-      props_data_.SetChanged(index, true);
+      properties_->MarkChanged(index, true);
     }
   }
 
   template <Enumeration T>
-  [[nodiscard]] T GetEnumProperty(TypedIndex<T> index) const noexcept {
-    return static_cast<T>(props_data_.GetProperty(index));
+  [[nodiscard]] T GetEnumProperty(
+      ProgramProperties::TypedIndex<T> index) const noexcept {
+    return static_cast<T>(properties_->GetProperty(index));
   }
 
   template <typename T, int N>
@@ -472,22 +330,5 @@ struct ParametersWidget {
   std::array<std::string, kNumTextureWrapModes> wrap_modes_;
   std::array<std::string, kNumTextureFilters> tex_filters_;
 
-  PropsData props_data_;
-  ColorIndex clear_color_idx_;
-  ColorIndex global_color_idx_;
-  ColorIndex border_color_idx_;
-  FloatIndex line_width_idx_;
-  FloatIndex point_size_idx_;
-  FloatIndex near_plane_;
-  FloatIndex far_plane_;
-  FloatIndex fov_;
-  TypedIndex<glm::vec2> tex_mult_;
-  TypedIndex<GlPolygonMode> polygon_mode_idx_;
-  TypedIndex<GlTextureWrapMode> wrap_mode_s_;
-  TypedIndex<GlTextureWrapMode> wrap_mode_t_;
-  TypedIndex<GlTextureWrapMode> wrap_mode_r_;
-  TypedIndex<glm::mat4> model_;
-  TypedIndex<glm::mat4> view_;
-  TypedIndex<GlTextureFilter> min_filter_;
-  TypedIndex<GlTextureFilter> mag_filter_;
+  ProgramProperties* properties_;
 };

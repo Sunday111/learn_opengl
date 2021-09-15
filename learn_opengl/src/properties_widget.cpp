@@ -1,25 +1,28 @@
 #include "properties_widget.hpp"
 
-ParametersWidget::ParametersWidget() {
-  props_data_.AddProperty(clear_color_idx_, {0.2f, 0.3f, 0.3f, 1.0f});
-  props_data_.AddProperty(global_color_idx_, {0.5f, 0.0f, 0.0f, 1.0f});
-  props_data_.AddProperty(border_color_idx_, {0.0f, 0.0f, 0.0f, 1.0f});
-  props_data_.AddProperty(line_width_idx_, 1.0f);
-  props_data_.AddProperty(point_size_idx_, 1.0f);
-  props_data_.AddProperty(polygon_mode_idx_, GlPolygonMode::Fill);
-  props_data_.AddProperty(wrap_mode_s_, GlTextureWrapMode::Repeat);
-  props_data_.AddProperty(wrap_mode_t_, GlTextureWrapMode::Repeat);
-  props_data_.AddProperty(wrap_mode_r_, GlTextureWrapMode::Repeat);
-  props_data_.AddProperty(tex_mult_, {1.0f, 1.0f});
-  props_data_.AddProperty(model_, glm::mat4(1.0));
-  props_data_.AddProperty(
-      view_, glm::translate(glm::mat4(1.0), glm::vec3(0.0f, 0.0f, -3.0f)));
-  props_data_.AddProperty(min_filter_, GlTextureFilter::LinearMipmapLinear);
-  props_data_.AddProperty(mag_filter_, GlTextureFilter::Linear);
-  props_data_.AddProperty(near_plane_, 0.1f);
-  props_data_.AddProperty(far_plane_, 100.0f);
-  props_data_.AddProperty(fov_, 45.0f);
+ProgramProperties::ProgramProperties() {
+  props_data_.AddProperty(clear_color, {0.2f, 0.3f, 0.3f, 1.0f});
+  props_data_.AddProperty(global_color, {0.5f, 0.0f, 0.0f, 1.0f});
+  props_data_.AddProperty(tex_border_color, {0.0f, 0.0f, 0.0f, 1.0f});
+  props_data_.AddProperty(line_width, 1.0f);
+  props_data_.AddProperty(point_size, 1.0f);
+  props_data_.AddProperty(polygon_mode, GlPolygonMode::Fill);
+  props_data_.AddProperty(wrap_mode_s, GlTextureWrapMode::Repeat);
+  props_data_.AddProperty(wrap_mode_t, GlTextureWrapMode::Repeat);
+  props_data_.AddProperty(wrap_mode_r, GlTextureWrapMode::Repeat);
+  props_data_.AddProperty(tex_mult, {1.0f, 1.0f});
+  props_data_.AddProperty(eye, {3.0f, 3.0f, 3.0f});
+  props_data_.AddProperty(look_at, {0.0f, 0.0f, 0.0f});
+  props_data_.AddProperty(camera_up, {0.0f, 0.0f, 1.0f});
+  props_data_.AddProperty(min_filter, GlTextureFilter::LinearMipmapLinear);
+  props_data_.AddProperty(mag_filter, GlTextureFilter::Linear);
+  props_data_.AddProperty(near_plane, 0.1f);
+  props_data_.AddProperty(far_plane, 100.0f);
+  props_data_.AddProperty(fov, 45.0f);
+}
 
+ParametersWidget::ParametersWidget(ProgramProperties* properties)
+    : properties_(properties) {
   polygon_modes_[0] = "point";
   polygon_modes_[1] = "line";
   polygon_modes_[2] = "fill";
@@ -40,71 +43,72 @@ ParametersWidget::ParametersWidget() {
 
 void ParametersWidget::Update() {
   ImGui::Begin("Settings");
-  props_data_.SetAllFlags(false);
   ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
               static_cast<double>(1000.0f / ImGui::GetIO().Framerate),
               static_cast<double>(ImGui::GetIO().Framerate));
-  ColorProperty("clear color", clear_color_idx_);
-  ColorProperty("draw color multiplier", global_color_idx_);
-  ColorProperty("border color", border_color_idx_);
+  ColorProperty("clear color", properties_->clear_color);
+  ColorProperty("draw color multiplier", properties_->global_color);
+  ColorProperty("border color", properties_->tex_border_color);
   PolygonModeWidget();
   if (ImGui::CollapsingHeader("Texture Sampling")) {
-    EnumProperty("wrap s", wrap_mode_s_, std::span(wrap_modes_));
-    EnumProperty("wrap t", wrap_mode_t_, std::span(wrap_modes_));
-    EnumProperty("wrap r", wrap_mode_r_, std::span(wrap_modes_));
-    EnumProperty("min filter", min_filter_, std::span(tex_filters_));
-    EnumProperty("mag filter", mag_filter_,
+    EnumProperty("wrap s", properties_->wrap_mode_s, std::span(wrap_modes_));
+    EnumProperty("wrap t", properties_->wrap_mode_t, std::span(wrap_modes_));
+    EnumProperty("wrap r", properties_->wrap_mode_r, std::span(wrap_modes_));
+    EnumProperty("min filter", properties_->min_filter,
+                 std::span(tex_filters_));
+    EnumProperty("mag filter", properties_->mag_filter,
                  std::span(tex_filters_).subspan(0, 2));
   }
   if (ImGui::CollapsingHeader("Texture coordinates multiplication")) {
-    VectorProperty("mul", tex_mult_, 0.0f, 10.0f);
+    VectorProperty("mul", properties_->tex_mult, 0.0f, 10.0f);
   }
   if (ImGui::CollapsingHeader("Transformations")) {
-    ImGui::Text("model");
-    MatrixProperty("model", model_);
-    ImGui::Separator();
-    ImGui::Text("view");
-    MatrixProperty("view", view_);
+    ImGui::Text("Camera");
+    VectorProperty("eye", properties_->eye);
+    VectorProperty("look_at", properties_->look_at);
+    VectorProperty("camera_up", properties_->camera_up);
     ImGui::Separator();
     ImGui::Text("projection");
-    FloatProperty("near plane", near_plane_, 0.0f, 1000.0f);
-    FloatProperty("far plane", far_plane_, 0.0f, 1000.0f);
-    FloatProperty("fov", fov_, 0.1f, 89.0f);
+    FloatProperty("near plane", properties_->near_plane, 0.0f, 1000.0f);
+    FloatProperty("far plane", properties_->far_plane, 0.0f, 1000.0f);
+    FloatProperty("fov", properties_->fov, 0.1f, 89.0f);
   }
   ImGui::End();
 }
 
-void ParametersWidget::ColorProperty(const char* title,
-                                     ColorIndex index) noexcept {
-  auto& value = props_data_.GetProperty(index);
+void ParametersWidget::ColorProperty(
+    const char* title, ProgramProperties::ColorIndex index) noexcept {
+  auto& value = properties_->GetProperty(index);
   auto new_value = value;
   ImGui::ColorEdit3(title, reinterpret_cast<float*>(&new_value));
   [[unlikely]] if (VectorChanged(new_value, value)) {
     value = new_value;
-    props_data_.SetChanged(index, true);
+    properties_->MarkChanged(index, true);
   }
 }
 
-void ParametersWidget::FloatProperty(const char* title, FloatIndex index,
+void ParametersWidget::FloatProperty(const char* title,
+                                     ProgramProperties::FloatIndex index,
                                      float min, float max) noexcept {
-  auto& value = props_data_.GetProperty(index);
+  auto& value = properties_->GetProperty(index);
   auto new_value = value;
   ImGui::SliderFloat(title, &new_value, min, max);
   [[unlikely]] if (FloatChanged(new_value, value)) {
     value = new_value;
-    props_data_.SetChanged(index, true);
+    properties_->MarkChanged(index, true);
   }
 }
 
 void ParametersWidget::PolygonModeWidget() {
   if (ImGui::CollapsingHeader("Polygon Mode")) {
-    EnumProperty("mode", polygon_mode_idx_, std::span(polygon_modes_));
+    EnumProperty("mode", properties_->polygon_mode, std::span(polygon_modes_));
 
-    const GlPolygonMode mode = GetPolygonMode();
+    const GlPolygonMode mode =
+        properties_->GetProperty(properties_->polygon_mode);
     if (mode == GlPolygonMode::Point) {
-      FloatProperty("Point diameter", point_size_idx_, 1.0f, 100.0f);
+      FloatProperty("Point diameter", properties_->point_size, 1.0f, 100.0f);
     } else if (mode == GlPolygonMode::Line) {
-      FloatProperty("Line width", line_width_idx_, 1.0f, 10.0f);
+      FloatProperty("Line width", properties_->line_width, 1.0f, 10.0f);
     }
   }
 }
