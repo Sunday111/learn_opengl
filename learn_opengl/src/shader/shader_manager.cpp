@@ -87,7 +87,7 @@ std::shared_ptr<Shader> ShaderManager::LoadShader(const std::string& path) {
   auto add_one = [&](GLuint type, const char* json_name) {
     if (shader_json.contains(json_name)) {
       compiled[num_compiled] =
-          MakeShader(type, shaders_dir_ / shader_json[json_name]);
+          MakeShader(type, shaders_dir_ / std::string(shader_json[json_name]));
       num_compiled += 1;
     }
   };

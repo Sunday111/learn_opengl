@@ -204,6 +204,18 @@ int main([[maybe_unused]] int argc, char** argv) {
     {
       windows.front()->MakeContextCurrent();
       InitializeGLAD();
+
+      if (!glDebugMessageCallback) {
+        glDebugMessageCallback =
+            reinterpret_cast<decltype(glDebugMessageCallback)>(
+                glfwGetProcAddress("glDebugMessageCallback"));
+      }
+
+      if (!glDebugMessageControl) {
+        glDebugMessageControl =
+            reinterpret_cast<decltype(glDebugMessageControl)>(
+                glfwGetProcAddress("glDebugMessageControl"));
+      }
     }
 
     GlDebugMessenger::Start();

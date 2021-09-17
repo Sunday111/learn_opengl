@@ -4,6 +4,9 @@
 
 #include "fmt/format.h"
 
+#ifdef _MSC_VER
+#include "stb/stb_image.h"
+#else
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdouble-promotion"
 #pragma GCC diagnostic ignored "-Wcast-qual"
@@ -17,6 +20,7 @@
 #endif
 #include "stb/stb_image.h"
 #pragma GCC diagnostic pop
+#endif
 
 void ImageLoader::MoveFrom(ImageLoader& another) {
   *this = another;

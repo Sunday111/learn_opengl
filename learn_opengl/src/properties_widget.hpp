@@ -14,109 +14,110 @@ template <typename T>
 concept Enumeration = std::is_enum_v<T>;
 
 namespace properties_container_impl {
-template <typename Index, typename Value>
-struct TypedIndex {
-  using ValueType = Value;
-  using IndexType = Index;
-  IndexType index;
-};
+  template <typename Index, typename Value>
+  struct TypedIndex {
+    using ValueType = Value;
+    using IndexType = Index;
+    IndexType index;
+  };
 
-template <typename T>
-struct PropertyTypeStorage {
-  std::vector<bool> changed;
-  std::vector<T> values;
-};
-
-template <typename Index, typename... Types>
-struct PropertiesContainer {
- public:
   template <typename T>
-  [[nodiscard]] Index AddProperty(T&& initial = T{}) {
-    auto& storage = GetTypeStorage<T>();
-    const auto full_index = storage.values.size();
+  struct PropertyTypeStorage {
+    std::vector<bool> changed;
+    std::vector<T> values;
+  };
 
-    if constexpr (sizeof(full_index) > sizeof(Index)) {
-      [[unlikely]] if (full_index > std::numeric_limits<Index>::max()) {
-        throw std::runtime_error(
-            "Index out of range: too small type for index in properties "
-            "container");
+  template <typename Index, typename... Types>
+  struct PropertiesContainer {
+   public:
+    template <typename T>
+    [[nodiscard]] Index AddProperty(T&& initial = T{}) {
+      auto& storage = GetTypeStorage<T>();
+      const auto full_index = storage.values.size();
+
+      if constexpr (sizeof(full_index) > sizeof(Index)) {
+        [[unlikely]] if (full_index > std::numeric_limits<Index>::max()) {
+          throw std::runtime_error(
+              "Index out of range: too small type for index in properties "
+              "container");
+        }
       }
+
+      storage.values.push_back(std::forward<T>(initial));
+      storage.changed.push_back(false);
+      return static_cast<Index>(full_index);
     }
 
-    storage.values.push_back(std::forward<T>(initial));
-    storage.changed.push_back(false);
-    return static_cast<Index>(full_index);
-  }
+    template <typename T>
+    void AddProperty(TypedIndex<Index, T>& index, T&& initial = T{}) {
+      index.index = AddProperty<T>(std::forward<T>(initial));
+    }
 
-  template <typename T>
-  void AddProperty(TypedIndex<Index, T>& index, T&& initial = T{}) {
-    index.index = AddProperty<T>(std::forward<T>(initial));
-  }
+    template <typename T>
+    [[nodiscard]] bool IsPropertyChanged(
+        const TypedIndex<Index, T>& index) const noexcept {
+      return IsPropertyChanged<T>(index.index);
+    }
 
-  template <typename T>
-  [[nodiscard]] bool IsPropertyChanged(
-      const TypedIndex<Index, T>& index) const noexcept {
-    return IsPropertyChanged<T>(index.index);
-  }
+    template <typename T>
+    [[nodiscard]] bool IsPropertyChanged(Index index) const noexcept {
+      return GetTypeStorage<T>().changed[index];
+    }
 
-  template <typename T>
-  [[nodiscard]] bool IsPropertyChanged(Index index) const noexcept {
-    return GetTypeStorage<T>().changed[index];
-  }
+    template <typename T>
+    [[nodiscard]] T& GetProperty(Index index) noexcept {
+      return GetTypeStorage<T>().values[index];
+    }
 
-  template <typename T>
-  [[nodiscard]] T& GetProperty(Index index) noexcept {
-    return GetTypeStorage<T>().values[index];
-  }
+    template <typename T>
+    [[nodiscard]] T& GetProperty(TypedIndex<Index, T> index) noexcept {
+      return GetProperty<T>(index.index);
+    }
 
-  template <typename T>
-  [[nodiscard]] T& GetProperty(TypedIndex<Index, T> index) noexcept {
-    return GetProperty<T>(index.index);
-  }
+    template <typename T>
+    [[nodiscard]] const T& GetProperty(Index index) const noexcept {
+      return GetTypeStorage<T>().values[index];
+    }
 
-  template <typename T>
-  [[nodiscard]] const T& GetProperty(Index index) const noexcept {
-    return GetTypeStorage<T>().values[index];
-  }
+    template <typename T>
+    [[nodiscard]] const T& GetProperty(
+        TypedIndex<Index, T> index) const noexcept {
+      return GetProperty<T>(index.index);
+    }
 
-  template <typename T>
-  [[nodiscard]] const T& GetProperty(
-      TypedIndex<Index, T> index) const noexcept {
-    return GetProperty<T>(index.index);
-  }
+    template <typename T>
+    void SetFlags(bool value) noexcept {
+      auto& changed = GetTypeStorage<T>().changed;
+      std::fill(changed.begin(), changed.end(), value);
+    }
 
-  template <typename T>
-  void SetFlags(bool value) noexcept {
-    auto& changed = GetTypeStorage<T>().changed;
-    std::fill(changed.begin(), changed.end(), value);
-  }
+    void SetAllFlags(bool value) noexcept { (..., SetFlags<Types>(value)); }
 
-  void SetAllFlags(bool value) noexcept { (..., SetFlags<Types>(value)); }
+    template <typename T>
+    void SetChanged(Index index, bool value) noexcept {
+      GetTypeStorage<T>().changed[index] = value;
+    }
 
-  template <typename T>
-  void SetChanged(Index index, bool value) noexcept {
-    GetTypeStorage<T>().changed[index] = value;
-  }
+    template <typename T>
+    void SetChanged(TypedIndex<Index, T> index, bool value) noexcept {
+      SetChanged<T>(index.index, value);
+    }
 
-  template <typename T>
-  void SetChanged(TypedIndex<Index, T> index, bool value) noexcept {
-    SetChanged<T>(index.index, value);
-  }
+   private:
+    template <typename T>
+    [[nodiscard]] PropertyTypeStorage<T>& GetTypeStorage() noexcept {
+      return std::get<PropertyTypeStorage<T>>(data);
+    }
 
- private:
-  template <typename T>
-  [[nodiscard]] PropertyTypeStorage<T>& GetTypeStorage() noexcept {
-    return std::get<PropertyTypeStorage<T>>(data);
-  }
+    template <typename T>
+    [[nodiscard]] const PropertyTypeStorage<T>& GetTypeStorage()
+        const noexcept {
+      return std::get<PropertyTypeStorage<T>>(data);
+    }
 
-  template <typename T>
-  [[nodiscard]] const PropertyTypeStorage<T>& GetTypeStorage() const noexcept {
-    return std::get<PropertyTypeStorage<T>>(data);
-  }
-
- private:
-  std::tuple<PropertyTypeStorage<Types>...> data;
-};
+   private:
+    std::tuple<PropertyTypeStorage<Types>...> data;
+  };
 }  // namespace properties_container_impl
 
 class ProgramProperties {
@@ -227,8 +228,6 @@ struct ParametersWidget {
     if constexpr (std::is_same_v<T, double>) {
       return ImGuiDataType_Double;
     }
-
-    return ImGuiDataType_COUNT;
   }
 
   template <typename T, int N>

@@ -19,3 +19,6 @@
 [submodule "dep/tinyobjloader"]
 	path = dep/tinyobjloader
 	url = https://github.com/tinyobjloader/tinyobjloader
+[submodule "dep/fmt"]
+	path = dep/fmt
+	url = https://github.com/fmtlib/fmt

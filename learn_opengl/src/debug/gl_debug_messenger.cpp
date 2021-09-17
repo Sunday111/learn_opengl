@@ -1,6 +1,6 @@
 #include "debug/gl_debug_messenger.hpp"
 
-#include "macro.hpp"
+#include "macro/to_string.hpp"
 #include "spdlog/spdlog.h"
 
 void GlDebugMessenger::Start() {
