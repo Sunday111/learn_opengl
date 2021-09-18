@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "camera.hpp"
 #include "debug/gl_debug_messenger.hpp"
 #include "image_loader.hpp"
 #include "include_glfw.hpp"
@@ -19,6 +20,7 @@
 #include "shader/shader.hpp"
 #include "shader/shader_manager.hpp"
 #include "template/class_member_traits.hpp"
+#include "window.hpp"
 
 class GlfwState {
  public:
@@ -43,84 +45,6 @@ class GlfwState {
 
  private:
   bool initialized_ = false;
-};
-
-class Window {
- public:
-  Window(ui32 width = 800, ui32 height = 600)
-      : id_(MakeWindowId()), width_(width), height_(height) {
-    Create();
-  }
-
-  ~Window() { Destroy(); }
-
-  void MakeContextCurrent() { glfwMakeContextCurrent(window_); }
-
-  [[nodiscard]] bool ShouldClose() const {
-    return glfwWindowShouldClose(window_);
-  }
-
-  [[nodiscard]] ui32 GetWidth() const noexcept { return width_; }
-  [[nodiscard]] ui32 GetHeight() const noexcept { return height_; }
-  [[nodiscard]] float GetAspect() const noexcept {
-    return static_cast<float>(GetWidth()) / static_cast<float>(GetHeight());
-  }
-
-  void ProcessInput() {
-    if (glfwGetKey(window_, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-      glfwSetWindowShouldClose(window_, true);
-  }
-
-  void SwapBuffers() { glfwSwapBuffers(window_); }
-  GLFWwindow* GetGlfwWindow() const { return window_; }
-
- private:
-  static ui32 MakeWindowId() {
-    static ui32 next_id = 0;
-    return next_id++;
-  }
-
-  static void FrameBufferSizeCallback(GLFWwindow* glfw_window, int width,
-                                      int height) {
-    void* user_pointer = glfwGetWindowUserPointer(glfw_window);
-    if (user_pointer) {
-      Window* window = reinterpret_cast<Window*>(user_pointer);
-      window->OnResize(width, height);
-    }
-  }
-
-  void Create() {
-    window_ =
-        glfwCreateWindow(static_cast<int>(width_), static_cast<int>(height_),
-                         "LearnOpenGL", NULL, NULL);
-
-    if (!window_) {
-      throw std::runtime_error(fmt::format("Failed to create window"));
-    }
-
-    glfwSetWindowUserPointer(window_, this);
-    glfwSetFramebufferSizeCallback(window_, FrameBufferSizeCallback);
-    spdlog::info("Created window {:d}", id_);
-  }
-
-  void Destroy() {
-    if (window_) {
-      spdlog::info("Destroyed window {:d}", id_);
-      glfwDestroyWindow(window_);
-      window_ = nullptr;
-    }
-  }
-
-  void OnResize(int width, int height) {
-    width_ = static_cast<ui32>(width);
-    height_ = static_cast<ui32>(height);
-  }
-
- private:
-  ui32 id_;
-  ui32 width_;
-  ui32 height_;
-  GLFWwindow* window_ = nullptr;
 };
 
 int InitializeGLAD_impl() {
@@ -236,31 +160,17 @@ int main([[maybe_unused]] int argc, char** argv) {
     OpenGl::SetUniform(color_uniform, properties.Get(properties.global_color));
     OpenGl::SetUniform(tex_mul_uniform, properties.Get(properties.tex_mult));
 
-    auto force_update_view_matrix = [&]() {
-      auto view_matrix = glm::lookAt(properties.Get(properties.eye),
-                                     properties.Get(properties.look_at),
-                                     properties.Get(properties.camera_up));
-      OpenGl::SetUniform(view_uniform, view_matrix);
-    };
-
-    auto update_view_matrix = [&]() {
-      [[unlikely]] if (properties.Changed(properties.eye) ||
-                       properties.Changed(properties.look_at) ||
-                       properties.Changed(properties.camera_up)) {
-        force_update_view_matrix();
-      }
-    };
-
-    force_update_view_matrix();
+    auto prev_frame_time = std::chrono::high_resolution_clock::now();
 
     while (!windows.empty()) {
+      const auto current_frame_time = std::chrono::high_resolution_clock::now();
+      const auto frame_delta_time =
+          std::chrono::duration<float, std::chrono::seconds::period>(
+              current_frame_time - prev_frame_time)
+              .count();
+
       for (size_t i = 0; i < windows.size();) {
         auto& window = windows[i];
-
-        auto p = glm::perspective(glm::radians(properties.Get(properties.fov)),
-                                  window->GetAspect(),
-                                  properties.Get(properties.near_plane),
-                                  properties.Get(properties.far_plane));
 
         [[unlikely]] if (window->ShouldClose()) {
           auto erase_it = windows.begin();
@@ -268,7 +178,7 @@ int main([[maybe_unused]] int argc, char** argv) {
           windows.erase(erase_it);
           continue;
         }
-        window->ProcessInput();
+        window->ProcessInput(frame_delta_time);
         window->MakeContextCurrent();
 
         // Start the Dear ImGui frame
@@ -296,16 +206,11 @@ int main([[maybe_unused]] int argc, char** argv) {
           OpenGl::SetUniform(tex_mul_uniform, color);
         });
 
-        update_view_matrix();
-
-        OpenGl::SetUniform(projection_uniform, p);
+        OpenGl::SetUniform(view_uniform, window->GetView());
+        OpenGl::SetUniform(projection_uniform, window->GetProjection());
 
         for (auto& model : models) {
-          float time = static_cast<float>(glfwGetTime());
-          float angle = std::sin(time) * glm::radians(90.0f);
-          auto model_matrix =
-              glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0.0f, 0.0f, 1.0f));
-          OpenGl::SetUniform(model_uniform, model_matrix);
+          OpenGl::SetUniform(model_uniform, glm::mat4(1.0f));
           model->Draw();
         }
         OpenGl::BindVertexArray(0);
@@ -316,6 +221,7 @@ int main([[maybe_unused]] int argc, char** argv) {
       }
 
       glfwPollEvents();
+      prev_frame_time = current_frame_time;
     }
   } catch (const std::exception& e) {
     spdlog::critical("Unhandled exception: {}", e.what());
