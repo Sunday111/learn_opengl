@@ -6,6 +6,7 @@
 class Component {
  public:
   [[nodiscard]] virtual ui32 GetTypeId() const noexcept = 0;
+  virtual void DrawDetails();
   virtual ~Component() noexcept = default;
 };
 

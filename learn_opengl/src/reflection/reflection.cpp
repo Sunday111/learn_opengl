@@ -2,6 +2,16 @@
 
 namespace reflection {
 
+void* TypeVariable::GetPtr(void* base) const noexcept {
+  const ui64 member_address = reinterpret_cast<ui64>(base) + offset;
+  return reinterpret_cast<void*>(member_address);
+}
+
+const void* TypeVariable::GetPtr(const void* base) const noexcept {
+  const ui64 member_address = reinterpret_cast<ui64>(base) + offset;
+  return reinterpret_cast<void*>(member_address);
+}
+
 TypeInfo* ReflectionHelper::GetTypeInfo(ui32 type_id) {
   TypeBank& type_bank = TypeBank::Instance();
   TypeInfo* type_info = type_bank.FindTypeInfo(type_id);

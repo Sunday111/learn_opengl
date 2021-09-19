@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cassert>
 #include <cstring>
 #include <iostream>
 #include <optional>
@@ -10,6 +11,7 @@
 
 #include "reflection/type_bank.hpp"
 #include "template/class_member_traits.hpp"
+#include "template/member_offset.hpp"
 
 namespace reflection {
 
@@ -17,8 +19,18 @@ template <typename T>
 struct TypeReflector;
 
 struct TypeVariable {
+  [[nodiscard]] void* GetPtr(void* base) const noexcept;
+  [[nodiscard]] const void* GetPtr(const void* base) const noexcept;
+
+  template <typename T>
+  [[nodiscard]] T* GetPtr(void* base) const noexcept;
+
+  template <typename T>
+  [[nodiscard]] const T* GetPtr(const void* base) const noexcept;
+
   std::string name;
   ui32 type_id;
+  ui16 offset;
 };
 
 struct TypeMethod {
@@ -97,6 +109,10 @@ void TypeHandle::Add(std::string_view name) const {
     TypeVariable v;
     v.name = name;
     v.type_id = member_type->id;
+
+    const size_t offset = MemberOffset<member>();
+    assert(std::numeric_limits<decltype(v.offset)>::max() >= offset);
+    v.offset = static_cast<decltype(v.offset)>(offset);
     Get()->variables.push_back(std::move(v));
   }
 
@@ -165,6 +181,18 @@ ui32 GetTypeId() {
 template <typename T>
 TypeHandle GetTypeInfo() {
   return TypeHandle{GetTypeId<T>()};
+}
+
+template <typename T>
+T* TypeVariable::GetPtr(void* base) const noexcept {
+  assert(GetTypeId<T>() == type_id);
+  return reinterpret_cast<T*>(GetPtr(base));
+}
+
+template <typename T>
+const T* TypeVariable::GetPtr(const void* base) const noexcept {
+  assert(GetTypeId<T>() == type_id);
+  return reinterpret_cast<const T*>(GetPtr(base));
 }
 
 }  // namespace reflection

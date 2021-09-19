@@ -7,7 +7,7 @@
 #include "entities/entity.hpp"
 #include "memory/memory.hpp"
 
-void EntityDeleter::operator()(Entity* entity) const {
+void World::EntityDeleter::operator()(Entity* entity) const {
   entity->~Entity();
   Memory::AlignedFree(entity);
 }
@@ -24,6 +24,8 @@ Entity& World::SpawnEntity(ui32 type_id) {
   void* memory = Memory::AlignedAlloc(type_info->size, type_info->alignment);
   type_info->default_constructor(memory);
   EntityPtr entity(reinterpret_cast<Entity*>(memory));
+  entity->SetId(next_entity_id_++);
+  entity->SetName(fmt::format("Entity {}", entity->GetId()));
   entities_.push_back(std::move(entity));
   return *entities_.back();
 }

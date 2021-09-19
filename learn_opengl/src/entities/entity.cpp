@@ -5,9 +5,10 @@
 #include <stdexcept>
 
 #include "components/component.hpp"
+#include "imgui.h"
 #include "memory/memory.hpp"
 
-void ComponentDeleter::operator()(Component* component) const {
+void Entity::ComponentDeleter::operator()(Component* component) const {
   component->~Component();
   Memory::AlignedFree(component);
 }
@@ -30,3 +31,15 @@ Component* Entity::AddComponent(ui32 type_id) {
   components_.push_back(std::move(component));
   return components_.back().get();
 }
+
+void Entity::DrawDetails() {
+  if (ImGui::TreeNode(name_.data())) {
+    if (ImGui::TreeNode("Components")) {
+      ForEachComp([&](Component& c) { c.DrawDetails(); });
+      ImGui::TreePop();
+    }
+    ImGui::TreePop();
+  }
+}
+
+void Entity::SetName(const std::string_view& name) { name_ = name; }

@@ -123,7 +123,7 @@ struct TypeReflector<Foo> {
 
 int main([[maybe_unused]] int argc, char** argv) {
   try {
-    spdlog::set_level(spdlog::level::trace);
+    spdlog::set_level(spdlog::level::warn);
     const std::filesystem::path exe_file = std::filesystem::path(argv[0]);
     std::vector<std::unique_ptr<Window>> windows;
 
@@ -226,6 +226,12 @@ int main([[maybe_unused]] int argc, char** argv) {
         widget.Update();
 
         UpdateProperties(properties);
+
+        ImGui::Begin("Details");
+        world.ForEachEntity([](Entity& entity) { entity.DrawDetails(); });
+        ImGui::End();
+
+        ImGui::ShowDemoWindow();
 
         // Rendering
         ImGui::Render();

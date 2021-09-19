@@ -196,40 +196,6 @@ struct ParametersWidget {
   void FloatProperty(const char* title, ProgramProperties::FloatIndex index,
                      float min, float max) noexcept;
 
-  template <typename T>
-  static constexpr ImGuiDataType_ CastDataType() noexcept {
-    if constexpr (std::is_same_v<T, i8>) {
-      return ImGuiDataType_S8;
-    }
-    if constexpr (std::is_same_v<T, ui8>) {
-      return ImGuiDataType_U8;
-    }
-    if constexpr (std::is_same_v<T, i16>) {
-      return ImGuiDataType_S16;
-    }
-    if constexpr (std::is_same_v<T, ui16>) {
-      return ImGuiDataType_U16;
-    }
-    if constexpr (std::is_same_v<T, i32>) {
-      return ImGuiDataType_S32;
-    }
-    if constexpr (std::is_same_v<T, ui32>) {
-      return ImGuiDataType_U32;
-    }
-    if constexpr (std::is_same_v<T, i64>) {
-      return ImGuiDataType_S64;
-    }
-    if constexpr (std::is_same_v<T, ui64>) {
-      return ImGuiDataType_U64;
-    }
-    if constexpr (std::is_same_v<T, float>) {
-      return ImGuiDataType_Float;
-    }
-    if constexpr (std::is_same_v<T, double>) {
-      return ImGuiDataType_Double;
-    }
-  }
-
   template <typename T, int N>
   void VectorProperty(const char* title,
                       ProgramProperties::TypedIndex<glm::vec<N, T>> index,
