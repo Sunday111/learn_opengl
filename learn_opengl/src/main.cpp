@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "components/camera_component.hpp"
 #include "components/mesh_component.hpp"
 #include "debug/gl_debug_messenger.hpp"
 #include "entities/entity.hpp"
@@ -20,6 +21,7 @@
 #include "shader/shader_manager.hpp"
 #include "template/class_member_traits.hpp"
 #include "window.hpp"
+#include "world.hpp"
 #include "wrap/wrap_glfw.hpp"
 #include "wrap/wrap_glm.hpp"
 #include "wrap/wrap_imgui.h"
@@ -169,13 +171,20 @@ int main([[maybe_unused]] int argc, char** argv) {
     const ui32 projection_uniform = shader->GetUniformLocation("projection");
     const GLuint texture = LoadTexture(textures_dir / "viking_room.png");
 
-    std::vector<std::unique_ptr<Entity>> entities;
+    World world;
 
+    // Create entity with camera component and link it with window
     {
-      std::unique_ptr<Entity> entity = std::make_unique<Entity>();
-      MeshComponent& mesh = entity->AddComponent<MeshComponent>();
+      auto& entity = world.SpawnEntity<Entity>();
+      CameraComponent& camera = entity.AddComponent<CameraComponent>();
+      windows.back()->SetCamera(&camera);
+    }
+
+    // Create entity with mesh component
+    {
+      auto& entity = world.SpawnEntity<Entity>();
+      MeshComponent& mesh = entity.AddComponent<MeshComponent>();
       mesh.Create((models_dir / "viking_room.obj").string(), texture, shader);
-      entities.push_back(std::move(entity));
     }
 
     UpdateProperties<true>(properties);
@@ -231,13 +240,12 @@ int main([[maybe_unused]] int argc, char** argv) {
         OpenGl::SetUniform(view_uniform, window->GetView());
         OpenGl::SetUniform(projection_uniform, window->GetProjection());
 
-        for (auto& entity : entities) {
-          entity->ForEachComp<MeshComponent>(
-              [&](MeshComponent& mesh_component) {
-                OpenGl::SetUniform(model_uniform, glm::mat4(1.0f));
-                mesh_component.Draw();
-              });
-        }
+        world.ForEachEntity([&](Entity& entity) {
+          entity.ForEachComp<MeshComponent>([&](MeshComponent& mesh_component) {
+            OpenGl::SetUniform(model_uniform, glm::mat4(1.0f));
+            mesh_component.Draw();
+          });
+        });
         OpenGl::BindVertexArray(0);
 
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

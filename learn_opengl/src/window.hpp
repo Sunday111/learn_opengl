@@ -6,7 +6,7 @@
 #include "wrap/wrap_glm.hpp"
 
 struct GLFWwindow;
-class CameraEntity;
+class CameraComponent;
 
 class Window {
  public:
@@ -27,6 +27,7 @@ class Window {
 
   void ProcessInput(float dt);
   void SwapBuffers() noexcept;
+  void SetCamera(CameraComponent* camera) { camera_ = camera; }
 
  private:
   static ui32 MakeWindowId();
@@ -56,7 +57,7 @@ class Window {
 
  private:
   GLFWwindow* window_ = nullptr;
-  std::unique_ptr<CameraEntity> camera_;
+  CameraComponent* camera_ = nullptr;
   glm::vec2 cursor_;
   ui32 id_;
   ui32 width_;

@@ -2,6 +2,7 @@
 
 #include <cstring>
 #include <iostream>
+#include <optional>
 #include <string_view>
 #include <tuple>
 #include <type_traits>
@@ -19,23 +20,39 @@ struct TypeVariable {
   std::string name;
   ui32 type_id;
 };
+
 struct TypeMethod {
   std::string name;
 };
 
 struct TypeInfo;
 
+struct ReflectionHelper {
+  [[nodiscard]] static TypeInfo* GetTypeInfo(ui32 type_id);
+};
+
 template <typename T>
-TypeHandle GetTypeInfo();
+[[nodiscard]] TypeHandle GetTypeInfo();
+[[nodiscard]] TypeInfo* GetTypeInfo(ui32 type_id);
 
 class TypeHandle {
  public:
   TypeInfo* operator->() const { return Get(); }
 
-  TypeInfo* Get() const { return TypeBank::Instance().FindTypeInfo(type_id); }
+  [[nodiscard]] bool IsA(ui32 base) const noexcept;
+
+  template <typename T>
+  [[nodiscard]] bool IsA() const noexcept {
+    return IsA(GetTypeId<T>());
+  }
+
+  TypeInfo* Get() const { return ReflectionHelper::GetTypeInfo(type_id); }
 
   template <auto member>
   void Add(std::string_view name) const;
+
+  template <typename Base>
+  void SetBaseClass() const;
 
   ui32 type_id;
 };
@@ -61,6 +78,7 @@ struct TypeInfo {
   ui32 id;
   ui32 alignment = 0;
   ui32 size = 0;
+  std::optional<ui32> base;
 
   TypeInfo() = default;
   TypeInfo(const TypeInfo&) = delete;
@@ -89,6 +107,12 @@ void TypeHandle::Add(std::string_view name) const {
   }
 }
 
+template <typename Base>
+void TypeHandle::SetBaseClass() const {
+  const ui32 base_type_id = GetTypeId<Base>();
+  Get()->base = base_type_id;
+}
+
 template <typename T>
 ui32 GetTypeId() {
   auto init = []() -> ui32 {
@@ -97,32 +121,34 @@ ui32 GetTypeId() {
     ti.size = sizeof(T);
     ti.alignment = alignof(T);
 
-    if constexpr (std::is_default_constructible_v<T>) {
-      ti.default_constructor = [](void* data) { new (data) T(); };
-    }
+    if constexpr (!std::is_abstract_v<T>) {
+      if constexpr (std::is_default_constructible_v<T>) {
+        ti.default_constructor = [](void* data) { new (data) T(); };
+      }
 
-    if constexpr (std::is_move_constructible_v<T>) {
-      ti.move_constructor = [](void* to, void* from) {
-        new (to) T(std::move(*reinterpret_cast<T*>(from)));
-      };
-    }
+      if constexpr (std::is_move_constructible_v<T>) {
+        ti.move_constructor = [](void* to, void* from) {
+          new (to) T(std::move(*reinterpret_cast<T*>(from)));
+        };
+      }
 
-    if constexpr (std::is_copy_constructible_v<T>) {
-      ti.copy_constructor = [](void* to, const void* from) {
-        new (to) T(*reinterpret_cast<const T*>(from));
-      };
-    }
+      if constexpr (std::is_copy_constructible_v<T>) {
+        ti.copy_constructor = [](void* to, const void* from) {
+          new (to) T(*reinterpret_cast<const T*>(from));
+        };
+      }
 
-    if constexpr (std::is_copy_assignable_v<T>) {
-      ti.copy_assign = [](void* value, const void* arg) {
-        new (value) T(*reinterpret_cast<const T*>(arg));
-      };
-    }
+      if constexpr (std::is_copy_assignable_v<T>) {
+        ti.copy_assign = [](void* value, const void* arg) {
+          new (value) T(*reinterpret_cast<const T*>(arg));
+        };
+      }
 
-    if constexpr (std::is_move_assignable_v<T>) {
-      ti.move_assign = [](void* value, void* arg) {
-        new (value) T(std::move(*reinterpret_cast<T*>(arg)));
-      };
+      if constexpr (std::is_move_assignable_v<T>) {
+        ti.move_assign = [](void* value, void* arg) {
+          new (value) T(std::move(*reinterpret_cast<T*>(arg)));
+        };
+      }
     }
 
     ui32 id = ti.id;

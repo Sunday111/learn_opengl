@@ -6,12 +6,11 @@
 #include <stdexcept>
 
 #include "GLFW/glfw3.h"
-#include "entities/camera_entity.hpp"
+#include "components/camera_component.hpp"
 
 Window::Window(ui32 width, ui32 height)
     : id_(MakeWindowId()), width_(width), height_(height) {
   Create();
-  camera_ = std::make_unique<CameraEntity>();
 }
 
 Window::~Window() { Destroy(); }

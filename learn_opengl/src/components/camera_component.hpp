@@ -1,9 +1,9 @@
 #pragma once
 
-#include "entities/entity.hpp"
+#include "components/component.hpp"
 #include "wrap/wrap_glm.hpp"
 
-class CameraEntity : public SimpleEntityBase<CameraEntity> {
+class CameraComponent : public SimpleComponentBase<CameraComponent> {
  public:
   [[nodiscard]] glm::mat4 GetProjection(float aspect) const noexcept;
   [[nodiscard]] glm::mat4 GetView() const noexcept;
@@ -23,7 +23,7 @@ class CameraEntity : public SimpleEntityBase<CameraEntity> {
 
 namespace reflection {
 template <>
-struct TypeReflector<CameraEntity> {
+struct TypeReflector<CameraComponent> {
   static void ReflectType(TypeHandle handle);
 };
 }  // namespace reflection

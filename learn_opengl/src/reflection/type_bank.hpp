@@ -6,6 +6,7 @@
 
 namespace reflection {
 struct TypeInfo;
+struct ReflectionHelper;
 class TypeHandle;
 
 class TypeBank {
@@ -19,7 +20,7 @@ class TypeBank {
   [[nodiscard]] const TypeInfo* FindTypeInfo(ui32 id) const noexcept;
 
  private:
-  friend TypeHandle;
+  friend ReflectionHelper;
   [[nodiscard]] TypeInfo* FindTypeInfo(ui32 id) noexcept;
 
  private:

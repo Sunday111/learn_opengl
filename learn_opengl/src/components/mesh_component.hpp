@@ -44,6 +44,7 @@ struct TypeReflector<MeshComponent> {
   static void ReflectType(TypeHandle handle) {
     handle->name = "MeshComponent";
     handle->guid = "C3F58B85-406E-4C03-A5AF-4CF736813D57";
+    handle.SetBaseClass<Component>();
   }
 };
 }  // namespace reflection

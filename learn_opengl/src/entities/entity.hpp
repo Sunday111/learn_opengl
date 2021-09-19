@@ -27,9 +27,10 @@ class Entity {
 
   template <typename T, typename F>
   void ForEachComp(F&& f) {
-    const ui32 type_id = reflection::GetTypeId<T>();
     for (auto& component : components_) {
-      if (component->GetTypeId() == type_id) {
+      const ui32 type_id = component->GetTypeId();
+      const reflection::TypeHandle type_info{type_id};
+      if (type_info.IsA<T>()) {
         f(*static_cast<T*>(component.get()));
       }
     }
