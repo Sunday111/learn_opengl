@@ -1,4 +1,4 @@
-#include "model3d.hpp"
+#include "components/mesh_component.hpp"
 
 #include <unordered_map>
 
@@ -7,6 +7,9 @@
 #include "template/member_offset.hpp"
 #include "template/type_to_gl_type.hpp"
 #include "tiny_obj_loader.h"
+
+MeshComponent::MeshComponent() = default;
+MeshComponent::~MeshComponent() = default;
 
 namespace std {
 template <>
@@ -70,9 +73,6 @@ static void LoadModel(const std::string& model_path,
   }
 }
 
-Model3d::Model3d() = default;
-Model3d::~Model3d() = default;
-
 template <auto MemberVariablePtr>
 void RegisterAttribute(GLuint location, bool normalized) {
   using MemberTraits = ClassMemberTraits<decltype(MemberVariablePtr)>;
@@ -85,9 +85,9 @@ void RegisterAttribute(GLuint location, bool normalized) {
   OpenGl::EnableVertexAttribArray(location);
 }
 
-void Model3d::Create(const std::span<const Vertex>& vertices,
-                     const std::span<const ui32>& indices, GLuint texture,
-                     const std::shared_ptr<Shader>& shader) {
+void MeshComponent::Create(const std::span<const Vertex>& vertices,
+                           const std::span<const ui32>& indices, GLuint texture,
+                           const std::shared_ptr<Shader>& shader) {
   vao_ = OpenGl::GenVertexArray();
   vbo_ = OpenGl::GenBuffer();
   ebo_ = OpenGl::GenBuffer();
@@ -114,15 +114,15 @@ void Model3d::Create(const std::span<const Vertex>& vertices,
   num_indices_ = indices.size();
 }
 
-void Model3d::Draw() {
+void MeshComponent::Draw() {
   shader_->Use();
   OpenGl::BindVertexArray(vao_);
   OpenGl::BindTexture2d(texture_);
   OpenGl::DrawElements(GL_TRIANGLES, num_indices_, GL_UNSIGNED_INT, nullptr);
 }
 
-void Model3d::Create(const std::string& path, GLuint texture,
-                     const std::shared_ptr<Shader>& shader) {
+void MeshComponent::Create(const std::string& path, GLuint texture,
+                           const std::shared_ptr<Shader>& shader) {
   std::vector<Vertex> vertices;
   std::vector<ui32> indices;
   LoadModel(path, vertices, indices);

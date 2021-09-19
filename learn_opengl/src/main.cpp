@@ -7,20 +7,22 @@
 #include <unordered_map>
 #include <vector>
 
-#include "camera.hpp"
+#include "components/mesh_component.hpp"
 #include "debug/gl_debug_messenger.hpp"
+#include "entities/entity.hpp"
 #include "image_loader.hpp"
-#include "include_glfw.hpp"
-#include "include_glm.hpp"
-#include "include_imgui.h"
 #include "integer.hpp"
-#include "model3d.hpp"
 #include "properties_widget.hpp"
 #include "read_file.hpp"
+#include "reflection/predefined.hpp"
+#include "reflection/reflection.hpp"
 #include "shader/shader.hpp"
 #include "shader/shader_manager.hpp"
 #include "template/class_member_traits.hpp"
 #include "window.hpp"
+#include "wrap/wrap_glfw.hpp"
+#include "wrap/wrap_glm.hpp"
+#include "wrap/wrap_imgui.h"
 
 class GlfwState {
  public:
@@ -100,10 +102,27 @@ void UpdateProperties(const ProgramProperties& p) noexcept {
   check_prop(p.mag_filter, OpenGl::SetTexture2dMagFilter);
 }
 
+struct Foo {
+  int a = -1;
+  float b = -1.0f;
+};
+
+namespace reflection {
+template <>
+struct TypeReflector<Foo> {
+  static void ReflectType(TypeHandle handle) {
+    handle->name = "Foo";
+    handle->guid = "28D310C8-C966-42FF-8C5D-145947826729";
+    handle.Add<&Foo::a>("a");
+    handle.Add<&Foo::b>("b");
+  }
+};
+}  // namespace reflection
+
 int main([[maybe_unused]] int argc, char** argv) {
   try {
-    const std::filesystem::path exe_file = std::filesystem::path(argv[0]);
     spdlog::set_level(spdlog::level::trace);
+    const std::filesystem::path exe_file = std::filesystem::path(argv[0]);
     std::vector<std::unique_ptr<Window>> windows;
 
     const auto content_dir = exe_file.parent_path() / "content";
@@ -150,10 +169,14 @@ int main([[maybe_unused]] int argc, char** argv) {
     const ui32 projection_uniform = shader->GetUniformLocation("projection");
     const GLuint texture = LoadTexture(textures_dir / "viking_room.png");
 
-    std::vector<std::unique_ptr<Model3d>> models;
-    models.push_back(std::make_unique<Model3d>());
-    models.back()->Create((models_dir / "viking_room.obj").string(), texture,
-                          shader);
+    std::vector<std::unique_ptr<Entity>> entities;
+
+    {
+      std::unique_ptr<Entity> entity = std::make_unique<Entity>();
+      MeshComponent& mesh = entity->AddComponent<MeshComponent>();
+      mesh.Create((models_dir / "viking_room.obj").string(), texture, shader);
+      entities.push_back(std::move(entity));
+    }
 
     UpdateProperties<true>(properties);
     shader->Use();
@@ -181,6 +204,10 @@ int main([[maybe_unused]] int argc, char** argv) {
         window->ProcessInput(frame_delta_time);
         window->MakeContextCurrent();
 
+        OpenGl::Viewport(0, 0, static_cast<GLsizei>(window->GetWidth()),
+                         static_cast<GLsizei>(window->GetHeight()));
+        OpenGl::Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
@@ -188,16 +215,11 @@ int main([[maybe_unused]] int argc, char** argv) {
 
         properties.MarkAllChanged(false);
         widget.Update();
-        // ImGui::ShowDemoWindow();
 
         UpdateProperties(properties);
 
         // Rendering
         ImGui::Render();
-
-        OpenGl::Viewport(0, 0, static_cast<GLsizei>(window->GetWidth()),
-                         static_cast<GLsizei>(window->GetHeight()));
-        OpenGl::Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         properties.OnChange(properties.global_color,
                             [&](const glm::vec4& color) {
                               OpenGl::SetUniform(color_uniform, color);
@@ -209,9 +231,12 @@ int main([[maybe_unused]] int argc, char** argv) {
         OpenGl::SetUniform(view_uniform, window->GetView());
         OpenGl::SetUniform(projection_uniform, window->GetProjection());
 
-        for (auto& model : models) {
-          OpenGl::SetUniform(model_uniform, glm::mat4(1.0f));
-          model->Draw();
+        for (auto& entity : entities) {
+          entity->ForEachComp<MeshComponent>(
+              [&](MeshComponent& mesh_component) {
+                OpenGl::SetUniform(model_uniform, glm::mat4(1.0f));
+                mesh_component.Draw();
+              });
         }
         OpenGl::BindVertexArray(0);
 

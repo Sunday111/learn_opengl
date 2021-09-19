@@ -7,8 +7,8 @@
 #include <optional>
 #include <span>
 
-#include "include_glm.hpp"
 #include "integer.hpp"
+#include "wrap/wrap_glm.hpp"
 
 enum class GlPolygonMode : ui8 { Point, Line, Fill, Max };
 enum class GlTextureWrap : ui8 { S, T, R, Max };

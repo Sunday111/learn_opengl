@@ -1,10 +1,12 @@
 #pragma once
 
-#include "camera.hpp"
-#include "include_glm.hpp"
+#include <memory>
+
 #include "integer.hpp"
+#include "wrap/wrap_glm.hpp"
 
 struct GLFWwindow;
+class CameraEntity;
 
 class Window {
  public:
@@ -17,10 +19,8 @@ class Window {
   [[nodiscard]] ui32 GetWidth() const noexcept { return width_; }
   [[nodiscard]] ui32 GetHeight() const noexcept { return height_; }
   [[nodiscard]] GLFWwindow* GetGlfwWindow() const noexcept { return window_; }
-  [[nodiscard]] glm::mat4 GetView() const noexcept { return camera_.GetView(); }
-  [[nodiscard]] glm::mat4 GetProjection() const noexcept {
-    return camera_.GetProjection(GetAspect());
-  }
+  [[nodiscard]] glm::mat4 GetView() const noexcept;
+  [[nodiscard]] glm::mat4 GetProjection() const noexcept;
   [[nodiscard]] float GetAspect() const noexcept {
     return static_cast<float>(GetWidth()) / static_cast<float>(GetHeight());
   }
@@ -56,7 +56,7 @@ class Window {
 
  private:
   GLFWwindow* window_ = nullptr;
-  Camera camera_;
+  std::unique_ptr<CameraEntity> camera_;
   glm::vec2 cursor_;
   ui32 id_;
   ui32 width_;

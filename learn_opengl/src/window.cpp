@@ -6,10 +6,12 @@
 #include <stdexcept>
 
 #include "GLFW/glfw3.h"
+#include "entities/camera_entity.hpp"
 
 Window::Window(ui32 width, ui32 height)
     : id_(MakeWindowId()), width_(width), height_(height) {
   Create();
+  camera_ = std::make_unique<CameraEntity>();
 }
 
 Window::~Window() { Destroy(); }
@@ -23,14 +25,15 @@ bool Window::ShouldClose() const noexcept {
 void Window::ProcessInput(float dt) {
   if (glfwGetKey(window_, GLFW_KEY_ESCAPE) == GLFW_PRESS)
     glfwSetWindowShouldClose(window_, true);
-  const auto forward = dt * camera_.speed * camera_.front;
-  const auto right = dt * glm::cross(camera_.front, camera_.up) * camera_.speed;
+  const auto forward = dt * camera_->speed * camera_->front;
+  const auto right =
+      dt * glm::cross(camera_->front, camera_->up) * camera_->speed;
   glm::vec2 k{0.0f, 0.0f};
   if (glfwGetKey(window_, GLFW_KEY_W) == GLFW_PRESS) k.x = 1;
   if (glfwGetKey(window_, GLFW_KEY_S) == GLFW_PRESS) k.x = -1;
   if (glfwGetKey(window_, GLFW_KEY_A) == GLFW_PRESS) k.y = -1;
   if (glfwGetKey(window_, GLFW_KEY_D) == GLFW_PRESS) k.y = 1;
-  camera_.eye += forward * k.x + right * k.y;
+  camera_->eye += forward * k.x + right * k.y;
 }
 
 void Window::SwapBuffers() noexcept { glfwSwapBuffers(window_); }
@@ -115,7 +118,7 @@ void Window::OnMouseMove(glm::vec2 new_cursor) {
   auto delta = (new_cursor - cursor_) * sensitivity;
   cursor_ = new_cursor;
   if (input_mode_) {
-    camera_.AddInput(glm::vec3(delta, 0.0f));
+    camera_->AddInput(glm::vec3(delta, 0.0f));
   }
 }
 
@@ -134,6 +137,11 @@ void Window::OnMouseButton(int button, int action, [[maybe_unused]] int mods) {
 }
 
 void Window::OnMouseScroll([[maybe_unused]] float dx, float dy) {
-  camera_.fov -= dy;
-  camera_.fov = std::clamp(camera_.fov, 15.0f, 90.0f);
+  camera_->fov -= dy;
+  camera_->fov = std::clamp(camera_->fov, 15.0f, 90.0f);
+}
+
+glm::mat4 Window::GetView() const noexcept { return camera_->GetView(); }
+glm::mat4 Window::GetProjection() const noexcept {
+  return camera_->GetProjection(GetAspect());
 }

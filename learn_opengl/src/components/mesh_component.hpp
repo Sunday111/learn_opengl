@@ -3,8 +3,9 @@
 #include <memory>
 #include <string>
 
+#include "components/component.hpp"
 #include "gl_api.hpp"
-#include "include_glm.hpp"
+#include "wrap/wrap_glm.hpp"
 
 class Shader;
 
@@ -15,10 +16,10 @@ class Vertex {
   glm::vec3 color;
 };
 
-class Model3d {
+class MeshComponent : public SimpleComponentBase<MeshComponent> {
  public:
-  Model3d();
-  ~Model3d();
+  MeshComponent();
+  ~MeshComponent();
 
   void Create(const std::string& path, GLuint texture,
               const std::shared_ptr<Shader>& shader);
@@ -36,3 +37,13 @@ class Model3d {
   GLuint ebo_;  // element buffer object
   GLuint texture_ = 0;
 };
+
+namespace reflection {
+template <>
+struct TypeReflector<MeshComponent> {
+  static void ReflectType(TypeHandle handle) {
+    handle->name = "MeshComponent";
+    handle->guid = "C3F58B85-406E-4C03-A5AF-4CF736813D57";
+  }
+};
+}  // namespace reflection

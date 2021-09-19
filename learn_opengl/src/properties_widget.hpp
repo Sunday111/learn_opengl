@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "gl_api.hpp"
-#include "include_imgui.h"
+#include "wrap/wrap_imgui.h"
 
 template <typename T>
 concept Enumeration = std::is_enum_v<T>;
