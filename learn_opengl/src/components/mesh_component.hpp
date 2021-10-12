@@ -14,6 +14,7 @@ class Vertex {
   glm::vec3 position;
   glm::vec2 tex_coord;
   glm::vec3 color;
+  glm::vec3 normal;
 };
 
 class MeshComponent : public SimpleComponentBase<MeshComponent> {
@@ -27,7 +28,13 @@ class MeshComponent : public SimpleComponentBase<MeshComponent> {
   void Create(const std::span<const Vertex>& vertices,
               const std::span<const ui32>& indices, GLuint texture,
               const std::shared_ptr<Shader>& shader);
+
+  void MakeCube(float width, const glm::vec3& color,
+                const std::shared_ptr<Shader>& shader);
+
   void Draw();
+
+  virtual void DrawDetails() override;
 
  private:
   size_t num_indices_ = 0;

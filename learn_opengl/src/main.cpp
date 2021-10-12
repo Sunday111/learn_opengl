@@ -9,6 +9,8 @@
 
 #include "components/camera_component.hpp"
 #include "components/mesh_component.hpp"
+#include "components/point_light_component.hpp"
+#include "components/transform_component.hpp"
 #include "debug/gl_debug_messenger.hpp"
 #include "entities/entity.hpp"
 #include "image_loader.hpp"
@@ -18,7 +20,6 @@
 #include "reflection/predefined.hpp"
 #include "reflection/reflection.hpp"
 #include "shader/shader.hpp"
-#include "shader/shader_manager.hpp"
 #include "template/class_member_traits.hpp"
 #include "window.hpp"
 #include "world.hpp"
@@ -104,23 +105,6 @@ void UpdateProperties(const ProgramProperties& p) noexcept {
   check_prop(p.mag_filter, OpenGl::SetTexture2dMagFilter);
 }
 
-struct Foo {
-  int a = -1;
-  float b = -1.0f;
-};
-
-namespace reflection {
-template <>
-struct TypeReflector<Foo> {
-  static void ReflectType(TypeHandle handle) {
-    handle->name = "Foo";
-    handle->guid = "28D310C8-C966-42FF-8C5D-145947826729";
-    handle.Add<&Foo::a>("a");
-    handle.Add<&Foo::b>("b");
-  }
-};
-}  // namespace reflection
-
 int main([[maybe_unused]] int argc, char** argv) {
   try {
     spdlog::set_level(spdlog::level::warn);
@@ -131,8 +115,7 @@ int main([[maybe_unused]] int argc, char** argv) {
     const auto shaders_dir = content_dir / "shaders";
     const auto textures_dir = content_dir / "textures";
     const auto models_dir = content_dir / "models";
-    auto shader_manager =
-        std::make_unique<ShaderManager>(content_dir / "shaders");
+    Shader::shaders_dir_ = content_dir / "shaders";
 
     GlfwState glfw_state;
     glfw_state.Initialize();
@@ -146,10 +129,8 @@ int main([[maybe_unused]] int argc, char** argv) {
     windows.push_back(std::make_unique<Window>());
 
     // GLAD can be initialized only when glfw has window context
-    {
-      windows.front()->MakeContextCurrent();
-      InitializeGLAD();
-    }
+    windows.front()->MakeContextCurrent();
+    InitializeGLAD();
 
     GlDebugMessenger::Start();
     OpenGl::EnableDepthTest();
@@ -162,35 +143,59 @@ int main([[maybe_unused]] int argc, char** argv) {
 
     ProgramProperties properties;
     ParametersWidget widget(&properties);
-    auto shader = shader_manager->LoadShader("simple.shader.json");
-    const ui32 color_uniform = shader->GetUniformLocation("globalColor");
-    const ui32 tex_mul_uniform =
-        shader->GetUniformLocation("texCoordMultiplier");
+    auto shader = std::make_shared<Shader>("simple.shader.json");
+
     const ui32 model_uniform = shader->GetUniformLocation("model");
     const ui32 view_uniform = shader->GetUniformLocation("view");
+    const ui32 view_location_uniform =
+        shader->GetUniformLocation("viewLocation");
     const ui32 projection_uniform = shader->GetUniformLocation("projection");
+    const ui32 light_color_uniform = shader->GetUniformLocation("lightColor");
+    const ui32 light_location_uniform =
+        shader->GetUniformLocation("lightLocation");
     const GLuint texture = LoadTexture(textures_dir / "viking_room.png");
 
     World world;
 
+    // Create entity with light component
+    Entity& point_light = world.SpawnEntity<Entity>();
+    {
+      const glm::vec3 light_color(1.0f, 1.0f, 1.0f);
+      point_light.SetName("PointLight");
+      PointLightComponent& light =
+          point_light.AddComponent<PointLightComponent>();
+      light.color = light_color;
+      MeshComponent& mesh = point_light.AddComponent<MeshComponent>();
+      mesh.MakeCube(0.2f, light_color, shader);
+      TransformComponent& transform =
+          point_light.AddComponent<TransformComponent>();
+      transform.transform =
+          glm::translate(transform.transform, glm::vec3(1.0f, 1.0f, 1.0f));
+    }
+
     // Create entity with camera component and link it with window
     {
       auto& entity = world.SpawnEntity<Entity>();
+      entity.SetName("Camera");
       CameraComponent& camera = entity.AddComponent<CameraComponent>();
       windows.back()->SetCamera(&camera);
+      entity.AddComponent<TransformComponent>();
     }
 
     // Create entity with mesh component
     {
       auto& entity = world.SpawnEntity<Entity>();
+      entity.SetName("mesh");
       MeshComponent& mesh = entity.AddComponent<MeshComponent>();
-      mesh.Create((models_dir / "viking_room.obj").string(), texture, shader);
+      // mesh.Create((models_dir / "viking_room.obj").string(), texture,
+      // shader);
+      const glm::vec3 cube_color(1.0f, 1.0f, 1.0f);
+      mesh.MakeCube(1.0f, cube_color, shader);
+      entity.AddComponent<TransformComponent>();
     }
 
     UpdateProperties<true>(properties);
     shader->Use();
-    OpenGl::SetUniform(color_uniform, properties.Get(properties.global_color));
-    OpenGl::SetUniform(tex_mul_uniform, properties.Get(properties.tex_mult));
 
     auto prev_frame_time = std::chrono::high_resolution_clock::now();
 
@@ -227,30 +232,63 @@ int main([[maybe_unused]] int argc, char** argv) {
 
         UpdateProperties(properties);
 
+        static int selected_entity = -1;
         ImGui::Begin("Details");
-        world.ForEachEntity([](Entity& entity) { entity.DrawDetails(); });
+        ImGui::ListBox(
+            "Entities", &selected_entity,
+            [](void* data, int idx, const char** name) {
+              [[likely]] if (data) {
+                World* world = reinterpret_cast<World*>(data);
+                Entity* entity =
+                    world->GetEntityByIndex(static_cast<size_t>(idx));
+                [[likely]] if (entity) {
+                  *name = entity->GetName().data();
+                  return true;
+                }
+              }
+
+              return false;
+            },
+            &world, static_cast<int>(world.GetNumEntities()));
+        if (selected_entity >= 0) {
+          Entity* entity =
+              world.GetEntityByIndex(static_cast<size_t>(selected_entity));
+          if (entity) {
+            entity->DrawDetails();
+          }
+        }
         ImGui::End();
 
         ImGui::ShowDemoWindow();
 
         // Rendering
         ImGui::Render();
-        properties.OnChange(properties.global_color,
-                            [&](const glm::vec4& color) {
-                              OpenGl::SetUniform(color_uniform, color);
-                            });
-        properties.OnChange(properties.tex_mult, [&](const glm::vec2& color) {
-          OpenGl::SetUniform(tex_mul_uniform, color);
-        });
 
         OpenGl::SetUniform(view_uniform, window->GetView());
+        OpenGl::SetUniform(view_location_uniform, window->GetCamera()->eye);
         OpenGl::SetUniform(projection_uniform, window->GetProjection());
 
+        point_light.ForEachComp<TransformComponent>(
+            [&](TransformComponent& transform_component) {
+              glm::vec3 t(transform_component.transform[3]);
+              OpenGl::SetUniform(light_location_uniform, t);
+            });
+
+        point_light.ForEachComp<PointLightComponent>(
+            [&](PointLightComponent& light_component) {
+              OpenGl::SetUniform(light_color_uniform, light_component.color);
+            });
+
         world.ForEachEntity([&](Entity& entity) {
-          entity.ForEachComp<MeshComponent>([&](MeshComponent& mesh_component) {
-            OpenGl::SetUniform(model_uniform, glm::mat4(1.0f));
-            mesh_component.Draw();
-          });
+          entity.ForEachComp<TransformComponent>(
+              [&](TransformComponent& transform_component) {
+                OpenGl::SetUniform(model_uniform,
+                                   transform_component.transform);
+                OpenGl::SetUniform(model_uniform,
+                                   transform_component.transform);
+              });
+          entity.ForEachComp<MeshComponent>(
+              [&](MeshComponent& mesh_component) { mesh_component.Draw(); });
         });
         OpenGl::BindVertexArray(0);
 

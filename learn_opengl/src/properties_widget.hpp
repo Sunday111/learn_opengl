@@ -160,14 +160,12 @@ class ProgramProperties {
   void MarkAllChanged(bool changed) { props_data_.SetAllFlags(changed); }
 
   ColorIndex clear_color;
-  ColorIndex global_color;
   ColorIndex tex_border_color;
   FloatIndex line_width;
   FloatIndex point_size;
   FloatIndex near_plane;
   FloatIndex far_plane;
   FloatIndex fov;
-  TypedIndex<glm::vec2> tex_mult;
   TypedIndex<GlPolygonMode> polygon_mode;
   TypedIndex<GlTextureWrapMode> wrap_mode_s;
   TypedIndex<GlTextureWrapMode> wrap_mode_t;

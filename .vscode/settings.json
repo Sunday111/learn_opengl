@@ -94,7 +94,8 @@
         "xutility": "cpp",
         "future": "cpp",
         "csignal": "cpp",
-        "valarray": "cpp"
+        "valarray": "cpp",
+        "queue": "cpp"
     },
     "cmake.generator": "Ninja",
     "editor.formatOnSave": true

@@ -19,6 +19,7 @@ class Entity {
   void SetName(const std::string_view& name);
   void SetId(size_t id) { id_ = id; }
   [[nodiscard]] size_t GetId() const noexcept { return id_; }
+  [[nodiscard]] const std::string_view GetName() const { return name_; }
 
   Entity& operator=(const Entity&) = delete;
 

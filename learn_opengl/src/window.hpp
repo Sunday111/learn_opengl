@@ -28,6 +28,7 @@ class Window {
   void ProcessInput(float dt);
   void SwapBuffers() noexcept;
   void SetCamera(CameraComponent* camera) { camera_ = camera; }
+  CameraComponent* GetCamera() const { return camera_; }
 
  private:
   static ui32 MakeWindowId();

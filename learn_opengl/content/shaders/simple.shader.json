@@ -1,4 +1,22 @@
 {
     "vertex": "vertex_shader.vert",
-    "fragment": "fragment_shader.frag"
+    "fragment": "fragment_shader.frag",
+    "glsl_version": "330 core",
+    "variables": [
+        {
+            "name": "cv_ambientStrength",
+            "type": "float",
+            "default": "0.1f"
+        },
+        {
+            "name": "cv_specularStrength",
+            "type": "float",
+            "default": "0.5f"
+        },
+        {
+            "name": "cv_shininess",
+            "type": "float",
+            "default": "32.0f"
+        }
+    ]
 }

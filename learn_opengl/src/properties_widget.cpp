@@ -2,7 +2,6 @@
 
 ProgramProperties::ProgramProperties() {
   props_data_.AddProperty(clear_color, {0.2f, 0.3f, 0.3f, 1.0f});
-  props_data_.AddProperty(global_color, {0.5f, 0.0f, 0.0f, 1.0f});
   props_data_.AddProperty(tex_border_color, {0.0f, 0.0f, 0.0f, 1.0f});
   props_data_.AddProperty(line_width, 1.0f);
   props_data_.AddProperty(point_size, 1.0f);
@@ -10,7 +9,6 @@ ProgramProperties::ProgramProperties() {
   props_data_.AddProperty(wrap_mode_s, GlTextureWrapMode::Repeat);
   props_data_.AddProperty(wrap_mode_t, GlTextureWrapMode::Repeat);
   props_data_.AddProperty(wrap_mode_r, GlTextureWrapMode::Repeat);
-  props_data_.AddProperty(tex_mult, {1.0f, 1.0f});
   props_data_.AddProperty(eye, {3.0f, 3.0f, 3.0f});
   props_data_.AddProperty(look_at, {0.0f, 0.0f, 0.0f});
   props_data_.AddProperty(camera_up, {0.0f, 0.0f, 1.0f});
@@ -47,7 +45,6 @@ void ParametersWidget::Update() {
               static_cast<double>(1000.0f / ImGui::GetIO().Framerate),
               static_cast<double>(ImGui::GetIO().Framerate));
   ColorProperty("clear color", properties_->clear_color);
-  ColorProperty("draw color multiplier", properties_->global_color);
   ColorProperty("border color", properties_->tex_border_color);
   PolygonModeWidget();
   if (ImGui::CollapsingHeader("Texture Sampling")) {
@@ -58,9 +55,6 @@ void ParametersWidget::Update() {
                  std::span(tex_filters_));
     EnumProperty("mag filter", properties_->mag_filter,
                  std::span(tex_filters_).subspan(0, 2));
-  }
-  if (ImGui::CollapsingHeader("Texture coordinates multiplication")) {
-    VectorProperty("mul", properties_->tex_mult, 0.0f, 10.0f);
   }
   if (ImGui::CollapsingHeader("Transformations")) {
     ImGui::Text("Camera");

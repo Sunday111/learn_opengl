@@ -18,6 +18,15 @@ class World {
   void ForEachEntity(auto&& fn);
   Entity& SpawnEntity(ui32 type_id);
 
+  [[nodiscard]] inline size_t GetNumEntities() const noexcept {
+    return entities_.size();
+  }
+
+  [[nodiscard]] Entity* GetEntityByIndex(size_t index) const noexcept {
+    [[likely]] if (index < entities_.size()) { return entities_[index].get(); }
+    return nullptr;
+  }
+
  private:
   class EntityDeleter {
    public:

@@ -52,9 +52,13 @@ static void LoadModel(const std::string& model_path,
         Vertex v{};
         const size_t vertex_offset =
             static_cast<size_t>(3 * model_index.vertex_index);
-        v.position = {attrib.vertices[vertex_offset + 0u],
-                      attrib.vertices[vertex_offset + 1u],
-                      attrib.vertices[vertex_offset + 2u]};
+        const size_t normal_offset =
+            static_cast<size_t>(3 * model_index.normal_index);
+
+        for (int i = 0; i < 3; ++i) {
+          v.position[i] = attrib.vertices[vertex_offset + i];
+          v.normal[i] = attrib.normals[normal_offset + i];
+        }
 
         const size_t texcoord_offset =
             static_cast<size_t>(2 * model_index.texcoord_index);
@@ -108,10 +112,69 @@ void MeshComponent::Create(const std::span<const Vertex>& vertices,
   RegisterAttribute<&Vertex::position>(location++, false);
   RegisterAttribute<&Vertex::tex_coord>(location++, false);
   RegisterAttribute<&Vertex::color>(location++, false);
+  RegisterAttribute<&Vertex::normal>(location++, false);
 
   shader_ = shader;
   texture_ = texture;
   num_indices_ = indices.size();
+}
+
+void MeshComponent::MakeCube(float width, const glm::vec3& color,
+                             const std::shared_ptr<Shader>& shader) {
+  std::vector<Vertex> vertices;
+  std::vector<ui32> indices;
+  GLuint texture = 0;
+  const float half_width = width / 2.0f;
+
+  /* 0 ---- 1
+   * |    / |
+   * |  /   |
+   * |/     |
+   * 2 ---- 3
+   */
+
+  using v3f = glm::vec3;
+  using v2f = glm::vec2;
+
+  auto make_side_pos = [](size_t index, const v3f& x, const v3f& y) -> v3f {
+    auto tx = index % 2 ? x : -x;
+    auto ty = index / 2 ? y : -y;
+    return tx + ty;
+  };
+  auto make_side_tex_coord = [](size_t index) -> v2f {
+    return v2f{index % 2 ? 0.0f : 1.0f, index / 2 ? 1.0f : 0.0f};
+  };
+
+  constexpr std::array<ui32, 6> side_indices{2, 1, 0, 1, 2, 3};
+
+  auto add_side = [&](const v3f& x, const v3f& y, const v3f z) {
+    Vertex v;
+    v.color = color;
+    const ui32 side_start = static_cast<ui32>(vertices.size());
+    for (size_t i = 0; i < 4u; ++i) {
+      v.position = (make_side_pos(i, x, y) + z) * half_width;
+      v.tex_coord = make_side_tex_coord(i);
+      v.normal = z;
+      vertices.push_back(v);
+    }
+
+    for (const ui32 index : side_indices) {
+      indices.push_back(side_start + index);
+    }
+  };
+
+  constexpr v3f x(1.0f, 0.0f, 0.0f);
+  constexpr v3f y(0.0f, 1.0f, 0.0f);
+  constexpr v3f z(0.0f, 0.0f, 1.0f);
+
+  add_side(x, y, z);
+  add_side(-z, y, x);
+  add_side(-x, y, -z);
+  add_side(z, y, -x);
+  add_side(x, -z, y);
+  add_side(x, z, -y);
+
+  Create(vertices, indices, texture, shader);
 }
 
 void MeshComponent::Draw() {
@@ -119,6 +182,13 @@ void MeshComponent::Draw() {
   OpenGl::BindVertexArray(vao_);
   OpenGl::BindTexture2d(texture_);
   OpenGl::DrawElements(GL_TRIANGLES, num_indices_, GL_UNSIGNED_INT, nullptr);
+}
+
+void MeshComponent::DrawDetails() {
+  SimpleComponentBase<MeshComponent>::DrawDetails();
+  if (shader_) {
+    shader_->DrawDetails();
+  }
 }
 
 void MeshComponent::Create(const std::string& path, GLuint texture,
