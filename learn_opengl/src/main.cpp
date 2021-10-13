@@ -15,8 +15,10 @@
 #include "entities/entity.hpp"
 #include "image_loader.hpp"
 #include "integer.hpp"
+#include "name_cache/name_cache.hpp"
 #include "properties_widget.hpp"
 #include "read_file.hpp"
+#include "reflection/glm_reflect.hpp"
 #include "reflection/predefined.hpp"
 #include "reflection/reflection.hpp"
 #include "shader/shader.hpp"
@@ -145,14 +147,12 @@ int main([[maybe_unused]] int argc, char** argv) {
     ParametersWidget widget(&properties);
     auto shader = std::make_shared<Shader>("simple.shader.json");
 
-    const ui32 model_uniform = shader->GetUniformLocation("model");
-    const ui32 view_uniform = shader->GetUniformLocation("view");
-    const ui32 view_location_uniform =
-        shader->GetUniformLocation("viewLocation");
-    const ui32 projection_uniform = shader->GetUniformLocation("projection");
-    const ui32 light_color_uniform = shader->GetUniformLocation("lightColor");
-    const ui32 light_location_uniform =
-        shader->GetUniformLocation("lightLocation");
+    auto model_uniform = shader->GetUniform(Name("model"));
+    auto view_uniform = shader->GetUniform(Name("view"));
+    auto view_location_uniform = shader->GetUniform(Name("viewLocation"));
+    auto projection_uniform = shader->GetUniform(Name("projection"));
+    auto light_color_uniform = shader->GetUniform(Name("lightColor"));
+    auto light_location_uniform = shader->GetUniform(Name("lightLocation"));
     const GLuint texture = LoadTexture(textures_dir / "viking_room.png");
 
     World world;
@@ -262,9 +262,9 @@ int main([[maybe_unused]] int argc, char** argv) {
         // Rendering
         ImGui::Render();
 
-        OpenGl::SetUniform(view_uniform, window->GetView());
-        OpenGl::SetUniform(view_location_uniform, window->GetCamera()->eye);
-        OpenGl::SetUniform(projection_uniform, window->GetProjection());
+        shader->SetUniform(view_uniform, window->GetView());
+        shader->SetUniform(view_location_uniform, window->GetCamera()->eye);
+        shader->SetUniform(projection_uniform, window->GetProjection());
 
         point_light.ForEachComp<TransformComponent>(
             [&](TransformComponent& transform_component) {
@@ -274,22 +274,22 @@ int main([[maybe_unused]] int argc, char** argv) {
               const float a = 0.0f;
               l = glm::rotate(l, a, glm::vec3(0.0f, 0.0f, 1.0f));
               tr[3] = l;
-              OpenGl::SetUniform(light_location_uniform, glm::vec3(l));
+              shader->SetUniform(light_location_uniform, glm::vec3(l));
             });
 
         point_light.ForEachComp<PointLightComponent>(
             [&](PointLightComponent& light_component) {
-              OpenGl::SetUniform(light_color_uniform, light_component.color);
+              shader->SetUniform(light_color_uniform, light_component.color);
             });
 
         world.ForEachEntity([&](Entity& entity) {
           entity.ForEachComp<TransformComponent>(
               [&](TransformComponent& transform_component) {
-                OpenGl::SetUniform(model_uniform,
-                                   transform_component.transform);
-                OpenGl::SetUniform(model_uniform,
+                shader->SetUniform(model_uniform,
                                    transform_component.transform);
               });
+
+          shader->SendUniforms();
           entity.ForEachComp<MeshComponent>(
               [&](MeshComponent& mesh_component) { mesh_component.Draw(); });
         });

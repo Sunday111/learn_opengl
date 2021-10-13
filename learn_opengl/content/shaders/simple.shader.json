@@ -4,19 +4,36 @@
     "glsl_version": "330 core",
     "definitions": [
         {
-            "name": "cv_ambientStrength",
-            "type": "float",
-            "default": "0.1f"
+            "name": "cv_abmbient",
+            "type": "vec3",
+            "default": {
+                "x": 0.1,
+                "y": 0.1,
+                "z": 0.1
+            }
         },
         {
-            "name": "cv_specularStrength",
-            "type": "float",
-            "default": "0.5f"
+            "name": "cv_specular",
+            "type": "vec3",
+            "default": {
+                "x": 0.5,
+                "y": 0.5,
+                "z": 0.5
+            }
+        },
+        {
+            "name": "cv_diffuse",
+            "type": "vec3",
+            "default": {
+                "x": 0.5,
+                "y": 0.5,
+                "z": 0.5
+            }
         },
         {
             "name": "cv_shininess",
             "type": "float",
-            "default": "32.0f"
+            "default": 32.0
         }
     ]
 }

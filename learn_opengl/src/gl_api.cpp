@@ -102,6 +102,10 @@ ui32 OpenGl::GetUniformLocation(GLuint shader_program, const char* name) {
       fmt::format("Uniform with name {} was not found", name));
 }
 
+void OpenGl::SetUniform(ui32 location, const float& f) noexcept {
+  glUniform1f(static_cast<GLint>(location), f);
+}
+
 void OpenGl::SetUniform(ui32 location, const glm::mat4& m,
                         bool transpose) noexcept {
   glUniformMatrix4fv(static_cast<GLint>(location), 1, CastBool(transpose),

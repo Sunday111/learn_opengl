@@ -53,18 +53,19 @@ bool MatrixProperty(const std::string_view title, glm::mat<C, R, T>& value,
                     T min = std::numeric_limits<T>::lowest(),
                     T max = std::numeric_limits<T>::max()) noexcept {
   bool changed = false;
-  ImGui::PushID(title.data());
-  for (int row_index = 0; row_index < R; ++row_index) {
-    auto row = glm::row(value, row_index);
-    ImGui::PushID(row_index);
-    const bool row_changed =
-        ImGui::DragScalarN("", CastDataType<T>(), glm::value_ptr(row), C, 0.01f,
-                           &min, &max, "%.3f");
-    ImGui::PopID();
-    [[unlikely]] if (row_changed) { value = glm::row(value, row_index, row); }
-    changed = changed || row_changed;
+  if (ImGui::TreeNode(title.data())) {
+    for (int row_index = 0; row_index < R; ++row_index) {
+      auto row = glm::row(value, row_index);
+      ImGui::PushID(row_index);
+      const bool row_changed =
+          ImGui::DragScalarN("", CastDataType<T>(), glm::value_ptr(row), C,
+                             0.01f, &min, &max, "%.3f");
+      ImGui::PopID();
+      [[unlikely]] if (row_changed) { value = glm::row(value, row_index, row); }
+      changed = changed || row_changed;
+    }
+    ImGui::TreePop();
   }
-  ImGui::PopID();
   return changed;
 }
 

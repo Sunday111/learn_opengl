@@ -3,16 +3,23 @@
 #include <spdlog/spdlog.h>
 
 #include <array>
+#include <cassert>
 #include <filesystem>
 #include <fstream>
+#include <string_view>
 #include <vector>
 
 #include "components/type_id_widget.hpp"
 #include "nlohmann/json.hpp"
 #include "read_file.hpp"
+#include "reflection/glm_reflect.hpp"
+#include "reflection/predefined.hpp"
+#include "reflection/reflection.hpp"
 #include "shader/shader.hpp"
 #include "shader/shader_define.hpp"
+#include "shader/shader_uniform.hpp"
 #include "template/on_scope_leave.hpp"
+#include "wrap/wrap_imgui.h"
 
 std::filesystem::path Shader::shaders_dir_;
 
@@ -102,6 +109,8 @@ static auto get_shader_json(const std::filesystem::path& path) {
 }
 
 Shader::Shader(std::filesystem::path path) : path_(std::move(path)) {
+  definitions_initialized_ = false;
+  need_recompile_ = false;
   Compile();
 }
 
@@ -143,12 +152,14 @@ void Shader::Compile() {
     extra_sources.push_back(line);
   }
 
-  if (!initialized_ && shader_json.contains("definitions")) {
-    for (const auto& def_json : shader_json["definitions"]) {
-      defines_.push_back(ShaderDefine::ReadFromJson(def_json));
+  if (!definitions_initialized_) {
+    if (shader_json.contains("definitions")) {
+      for (const auto& def_json : shader_json["definitions"]) {
+        defines_.push_back(ShaderDefine::ReadFromJson(def_json));
+      }
     }
 
-    initialized_ = true;
+    definitions_initialized_ = true;
   }
 
   for (const auto& definition : defines_) {
@@ -179,21 +190,85 @@ void Shader::Compile() {
 
   program_ = LinkShaders(std::span(compiled).subspan(0, num_compiled));
   need_recompile_ = false;
+
+  UpdateUniforms();
 }
 
 void Shader::DrawDetails() {
-  for (ShaderDefine& definition : defines_) {
-    bool value_changed = false;
-    SimpleTypeWidget(definition.type_id, definition.name,
-                     definition.value.data(), value_changed);
+  if (ImGui::TreeNode("Static Variables")) {
+    for (ShaderDefine& definition : defines_) {
+      bool value_changed = false;
+      SimpleTypeWidget(definition.type_id, definition.name,
+                       definition.value.data(), value_changed);
 
-    if (value_changed) {
-      need_recompile_ = true;
+      if (value_changed) {
+        need_recompile_ = true;
+      }
     }
+    ImGui::TreePop();
+  }
+
+  if (ImGui::TreeNode("Dynamic Variables")) {
+    for (ShaderUniform& uniform : uniforms_) {
+      bool value_changed = false;
+      SimpleTypeWidget(uniform.type_id, uniform.name.GetView(),
+                       uniform.value.data(), value_changed);
+    }
+    ImGui::TreePop();
   }
 
   if (need_recompile_) {
     Compile();
+  }
+}
+
+std::optional<UniformHandle> Shader::FindUniform(Name name) const noexcept {
+  std::optional<UniformHandle> result;
+  for (size_t index = 0; index < uniforms_.size(); ++index) {
+    const ShaderUniform& uniform = uniforms_[index];
+    if (uniform.name == name) {
+      UniformHandle h;
+      h.name = name;
+      h.index = index;
+      result = h;
+      break;
+    }
+  }
+
+  return result;
+}
+
+UniformHandle Shader::GetUniform(Name name) const {
+  [[likely]] if (auto maybe_handle = FindUniform(name); maybe_handle) {
+    return *maybe_handle;
+  }
+
+  throw std::runtime_error(
+      fmt::format("Uniform is not found: \"{}\"", name.GetView()));
+}
+
+void Shader::SetUniform(UniformHandle& handle, ui32 type_id,
+                        std::span<const ui8> data) {
+  if (handle.index >= uniforms_.size() ||
+      uniforms_[handle.index].name != handle.name) {
+    handle = GetUniform(handle.name);
+  }
+
+  ShaderUniform& uniform = uniforms_[handle.index];
+
+  [[unlikely]] if (uniform.type_id != type_id ||
+                   uniform.value.size() != data.size()) {
+    throw std::runtime_error(
+        "Trying to assign a value of invalid type to uniform");
+  }
+
+  assert(uniform.value.size() == data.size());
+  std::copy(data.begin(), data.end(), uniform.value.begin());
+}
+
+void Shader::SendUniforms() {
+  for (const ShaderUniform& uniform : uniforms_) {
+    uniform.SendValue();
   }
 }
 
@@ -206,6 +281,109 @@ void Shader::Destroy() {
     glDeleteProgram(*program_);
     program_.reset();
   }
+}
+
+std::optional<ui32> ConvertGlType(GLenum gl_type) {
+  switch (gl_type) {
+    case GL_FLOAT:
+      return reflection::GetTypeId<float>();
+      break;
+
+    case GL_FLOAT_VEC2:
+      return reflection::GetTypeId<glm::vec2>();
+      break;
+
+    case GL_FLOAT_VEC3:
+      return reflection::GetTypeId<glm::vec3>();
+      break;
+
+    case GL_FLOAT_VEC4:
+      return reflection::GetTypeId<glm::vec4>();
+      break;
+
+    case GL_FLOAT_MAT3:
+      return reflection::GetTypeId<glm::mat3>();
+      break;
+
+    case GL_FLOAT_MAT4:
+      return reflection::GetTypeId<glm::mat4>();
+      break;
+  }
+
+  return std::optional<ui32>();
+}
+
+void Shader::UpdateUniforms() {
+  GLint num_uniforms;
+  glGetProgramiv(*program_, GL_ACTIVE_UNIFORMS, &num_uniforms);
+  [[unlikely]] if (num_uniforms < 1) { return; }
+
+  GLint max_name_legth;
+  glGetProgramiv(*program_, GL_ACTIVE_UNIFORM_MAX_LENGTH, &max_name_legth);
+
+  std::string name_buffer_heap;
+  constexpr GLsizei name_buffer_size_stack = 64;
+  GLchar name_buffer_stack[name_buffer_size_stack];
+
+  GLsizei name_buffer_size;
+  char* name_buffer;
+
+  if (max_name_legth < name_buffer_size_stack) {
+    name_buffer = name_buffer_stack;
+    name_buffer_size = name_buffer_size_stack;
+  } else {
+    name_buffer_heap.resize(static_cast<size_t>(max_name_legth));
+    name_buffer = name_buffer_heap.data();
+    name_buffer_size = static_cast<GLsizei>(max_name_legth);
+  }
+
+  std::vector<ShaderUniform> uniforms;
+  uniforms.reserve(num_uniforms);
+  for (GLint i = 0; i < num_uniforms; ++i) {
+    GLint variable_size;
+    GLenum glsl_type;
+    GLsizei actual_name_length;
+    glGetActiveUniform(*program_, i, name_buffer_size, &actual_name_length,
+                       &variable_size, &glsl_type, name_buffer);
+
+    const auto variable_name = Name(
+        std::string_view(name_buffer, static_cast<size_t>(actual_name_length)));
+
+    const std::optional<ui32> cpp_type = ConvertGlType(glsl_type);
+    if (!cpp_type) {
+      continue;
+    }
+
+    const reflection::TypeHandle type_handle{*cpp_type};
+
+    // find existing variable
+    auto found_uniform_it = std::find_if(
+        uniforms_.begin(), uniforms_.end(),
+        [&](const ShaderUniform& u) { return u.name == variable_name; });
+
+    auto init_value = [&](ShaderUniform& uniform) {
+      uniform.value.resize(type_handle->size);
+      type_handle->default_constructor(uniform.value.data());
+    };
+
+    if (found_uniform_it != uniforms_.end()) {
+      uniforms.push_back(std::move(*found_uniform_it));
+      // the previous value can be saved only if variable has the same type
+      if (*cpp_type != found_uniform_it->type_id) {
+        init_value(uniforms.back());
+      }
+    } else {
+      uniforms.emplace_back();
+      auto& uniform = uniforms.back();
+      uniform.name = variable_name;
+      init_value(uniforms.back());
+    }
+
+    uniforms.back().location = static_cast<ui32>(i);
+    uniforms.back().type_id = *cpp_type;
+  }
+
+  std::swap(uniforms, uniforms_);
 }
 
 void Shader::PrintUniforms() {

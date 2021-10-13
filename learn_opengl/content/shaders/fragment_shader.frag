@@ -1,6 +1,9 @@
-// cv_ambientStrength
-// cv_specularStrength
-// cv_shininess
+/* Defines:
+ *   vec3 cv_abmbient
+ *   vec3 cv_specular
+ *   vec3 cv_diffuse
+ *   float cv_shininess
+ */
 
 uniform sampler2D modelTexture;
 uniform vec3 lightColor;
@@ -21,9 +24,9 @@ void main() {
     vec3 viewDirection = normalize(viewLocation - fragmentLocation);
     vec3 reflectDirection = reflect(-lightDirection, normal);
 
-    float diffuse = max(dot(normal, lightDirection), 0.0f);
-    float specular = cv_specularStrength * pow(max(dot(viewDirection, reflectDirection), 0.0f), cv_shininess);
+    vec3 diffuse = max(dot(normal, lightDirection), 0.0f) * cv_diffuse;
+    vec3 specular = cv_specular * pow(max(dot(viewDirection, reflectDirection), 0.0f), cv_shininess);
     
-    vec3 resultColor = (cv_ambientStrength + diffuse + specular) * lightColor * fragmentColor;
+    vec3 resultColor = (cv_abmbient + diffuse + specular) * lightColor * fragmentColor;
     FragColor = vec4(resultColor, 1.0f);
 }

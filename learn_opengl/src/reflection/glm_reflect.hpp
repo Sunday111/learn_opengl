@@ -32,4 +32,11 @@ struct TypeReflector<glm::mat4> {
     handle->guid = "9B24C2C7-29CD-45F6-AC74-880866D492D0";
   }
 };
+template <>
+struct TypeReflector<glm::mat3> {
+  static void ReflectType(TypeHandle handle) {
+    handle->name = "glm::mat3";
+    handle->guid = "2D13324E-08A3-47AD-8AC8-9E861EF9F104";
+  }
+};
 }  // namespace reflection

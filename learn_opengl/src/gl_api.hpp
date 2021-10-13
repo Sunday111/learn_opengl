@@ -98,6 +98,8 @@ class OpenGl {
   [[nodiscard]] static constexpr GLint ConvertEnum(
       GlTextureFilter mode) noexcept;
 
+  static void SetUniform(ui32 location, const float& f) noexcept;
+
   static void SetUniform(ui32 location, const glm::mat4& m,
                          bool transpose = false) noexcept;
 
