@@ -11,7 +11,7 @@
 #include "nlohmann/json.hpp"
 #include "read_file.hpp"
 #include "shader/shader.hpp"
-#include "shader/shader_variable.hpp"
+#include "shader/shader_define.hpp"
 #include "template/on_scope_leave.hpp"
 
 std::filesystem::path Shader::shaders_dir_;
@@ -105,19 +105,26 @@ Shader::Shader(std::filesystem::path path) : path_(std::move(path)) {
   Compile();
 }
 
-Shader::~Shader() { glDeleteProgram(program_); }
-void Shader::Use() { OpenGl::UseProgram(program_); }
+Shader::~Shader() { Destroy(); }
+void Shader::Use() {
+  Check();
+  OpenGl::UseProgram(*program_);
+}
 
 std::optional<ui32> Shader::FindUniformLocation(
     const char* name) const noexcept {
-  return OpenGl::FindUniformLocation(program_, name);
+  Check();
+  return OpenGl::FindUniformLocation(*program_, name);
 }
 
 ui32 Shader::GetUniformLocation(const char* name) const noexcept {
-  return OpenGl::GetUniformLocation(program_, name);
+  Check();
+  return OpenGl::GetUniformLocation(*program_, name);
 }
 
 void Shader::Compile() {
+  Destroy();
+
   nlohmann::json shader_json = get_shader_json(shaders_dir_ / path_);
 
   size_t num_compiled = 0;
@@ -136,16 +143,16 @@ void Shader::Compile() {
     extra_sources.push_back(line);
   }
 
-  if (!initialized_ && shader_json.contains("variables")) {
-    for (const auto& variable_json : shader_json["variables"]) {
-      variables_.push_back(ShaderVariable::ReadFromJson(variable_json));
+  if (!initialized_ && shader_json.contains("definitions")) {
+    for (const auto& def_json : shader_json["definitions"]) {
+      defines_.push_back(ShaderDefine::ReadFromJson(def_json));
     }
 
     initialized_ = true;
   }
 
-  for (const auto& variable : variables_) {
-    extra_sources.push_back(variable.GenDefine());
+  for (const auto& definition : defines_) {
+    extra_sources.push_back(definition.GenDefine());
   }
 
   auto add_one = [&](GLuint type, const char* json_name) {
@@ -175,10 +182,10 @@ void Shader::Compile() {
 }
 
 void Shader::DrawDetails() {
-  for (ShaderVariable& variable : variables_) {
+  for (ShaderDefine& definition : defines_) {
     bool value_changed = false;
-    SimpleTypeWidget(variable.type_id, variable.name, variable.value.data(),
-                     value_changed);
+    SimpleTypeWidget(definition.type_id, definition.name,
+                     definition.value.data(), value_changed);
 
     if (value_changed) {
       need_recompile_ = true;
@@ -190,16 +197,29 @@ void Shader::DrawDetails() {
   }
 }
 
+void Shader::Check() const {
+  [[unlikely]] if (!program_) { throw std::runtime_error("Invalid shader"); }
+}
+
+void Shader::Destroy() {
+  if (program_) {
+    glDeleteProgram(*program_);
+    program_.reset();
+  }
+}
+
 void Shader::PrintUniforms() {
+  Check();
+
   GLint num_uniforms;
-  glGetProgramiv(program_, GL_ACTIVE_UNIFORMS, &num_uniforms);
+  glGetProgramiv(*program_, GL_ACTIVE_UNIFORMS, &num_uniforms);
 
   GLchar name[100];
   for (GLint i = 0; i < num_uniforms; ++i) {
     GLint strSize;
     GLenum type;
     GLsizei length;
-    glGetActiveUniform(program_, i, sizeof(name), &length, &strSize, &type,
+    glGetActiveUniform(*program_, i, sizeof(name), &length, &strSize, &type,
                        name);
 
     spdlog::warn("Uniform: {}", name);

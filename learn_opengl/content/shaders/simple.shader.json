@@ -2,7 +2,7 @@
     "vertex": "vertex_shader.vert",
     "fragment": "fragment_shader.frag",
     "glsl_version": "330 core",
-    "variables": [
+    "definitions": [
         {
             "name": "cv_ambientStrength",
             "type": "float",

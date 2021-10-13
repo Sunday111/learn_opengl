@@ -190,7 +190,7 @@ int main([[maybe_unused]] int argc, char** argv) {
       // mesh.Create((models_dir / "viking_room.obj").string(), texture,
       // shader);
       const glm::vec3 cube_color(1.0f, 1.0f, 1.0f);
-      mesh.MakeCube(1.0f, cube_color, shader);
+      mesh.MakeCube(1.0f, cube_color, shader);  //
       entity.AddComponent<TransformComponent>();
     }
 
@@ -259,8 +259,6 @@ int main([[maybe_unused]] int argc, char** argv) {
         }
         ImGui::End();
 
-        ImGui::ShowDemoWindow();
-
         // Rendering
         ImGui::Render();
 
@@ -270,8 +268,13 @@ int main([[maybe_unused]] int argc, char** argv) {
 
         point_light.ForEachComp<TransformComponent>(
             [&](TransformComponent& transform_component) {
-              glm::vec3 t(transform_component.transform[3]);
-              OpenGl::SetUniform(light_location_uniform, t);
+              auto& tr = transform_component.transform;
+              auto l = tr[3];
+              // const float a = glm::radians(90.0f) * frame_delta_time;
+              const float a = 0.0f;
+              l = glm::rotate(l, a, glm::vec3(0.0f, 0.0f, 1.0f));
+              tr[3] = l;
+              OpenGl::SetUniform(light_location_uniform, glm::vec3(l));
             });
 
         point_light.ForEachComp<PointLightComponent>(

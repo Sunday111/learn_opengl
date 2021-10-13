@@ -9,7 +9,7 @@
 #include "gl_api.hpp"
 #include "integer.hpp"
 
-class ShaderVariable;
+class ShaderDefine;
 
 class Shader {
  public:
@@ -25,13 +25,17 @@ class Shader {
   void PrintUniforms();
   void DrawDetails();
 
+ private:
+  void Check() const;
+  void Destroy();
+
  public:
   static std::filesystem::path shaders_dir_;
 
  private:
   std::filesystem::path path_;
-  std::vector<ShaderVariable> variables_;
-  GLuint program_;
+  std::vector<ShaderDefine> defines_;
+  std::optional<GLuint> program_;
   bool initialized_ = false;
   bool need_recompile_ = false;
 };
