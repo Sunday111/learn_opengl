@@ -6,8 +6,11 @@
 #include <bit>
 #include <optional>
 #include <span>
+#include <string_view>
 
+#include "fmt/format.h"
 #include "integer.hpp"
+#include "template/get_enum_underlying.hpp"
 #include "wrap/wrap_glm.hpp"
 
 enum class GlPolygonMode : ui8 { Point, Line, Fill, Max };
@@ -33,6 +36,27 @@ enum class GlTextureFilter : ui8 {
 
 class OpenGl {
  public:
+  template <typename T>
+  [[nodiscard]] static constexpr T Parse(std::string_view str);
+
+  [[nodiscard]] static constexpr bool TryParse(std::string_view str,
+                                               GlTextureWrapMode& out) noexcept;
+
+  [[nodiscard]] static constexpr bool TryParse(std::string_view str,
+                                               GlTextureWrap& out) noexcept;
+
+  [[nodiscard]] static constexpr bool TryParse(std::string_view str,
+                                               GlTextureFilter& out) noexcept;
+
+  [[nodiscard]] static constexpr std::string_view ToString(
+      GlTextureWrapMode wrap_mode) noexcept;
+
+  [[nodiscard]] static constexpr std::string_view ToString(
+      GlTextureWrap wrap) noexcept;
+
+  [[nodiscard]] static constexpr std::string_view ToString(
+      GlTextureFilter value) noexcept;
+
   [[nodiscard]] static GLuint GenVertexArray() noexcept;
   static void GenVertexArrays(const std::span<GLuint>& arrays) noexcept;
 
@@ -227,4 +251,137 @@ constexpr GLint OpenGl::ConvertEnum(GlTextureFilter mode) noexcept {
       return GL_LINEAR_MIPMAP_LINEAR;
       break;
   }
+}
+
+constexpr std::string_view OpenGl::ToString(GlTextureWrap v) noexcept {
+  using EnumType = decltype(v);
+  static_assert(GetEnumUnderlying(EnumType::Max) == 3U);
+  switch (v) {
+    case EnumType::S:
+      return "S";
+      break;
+    case EnumType::T:
+      return "T";
+      break;
+    case EnumType::R:
+      [[fallthrough]];
+    default:
+      return "R";
+      break;
+  }
+}
+
+constexpr std::string_view OpenGl::ToString(GlTextureWrapMode v) noexcept {
+  using EnumType = decltype(v);
+  static_assert(GetEnumUnderlying(EnumType::Max) == 5U);
+  switch (v) {
+    case EnumType::ClampToBorder:
+      return "ClampToBorder";
+      break;
+    case EnumType::ClampToEdge:
+      return "ClampToEdge";
+      break;
+    case EnumType::MirrorClampToEdge:
+      return "MirrorClampToEdge";
+      break;
+    case EnumType::MirroredRepeat:
+      return "MirroredRepeat";
+      break;
+    case EnumType::Repeat:
+      [[fallthrough]];
+    default:
+      return "Repeat";
+      break;
+  }
+}
+
+constexpr std::string_view OpenGl::ToString(GlTextureFilter value) noexcept {
+  using EnumType = decltype(value);
+  static_assert(GetEnumUnderlying(EnumType::Max) == 6U);
+  switch (value) {
+    case EnumType::Linear:
+      return "Linear";
+      break;
+    case EnumType::LinearMipmapLinear:
+      return "LinearMipmapLinear";
+      break;
+    case EnumType::LinearMipmapNearest:
+      return "LinearMipmapNearest";
+      break;
+    case EnumType::Nearest:
+      return "Nearest";
+      break;
+    case EnumType::NearestMipmapLinear:
+      return "NearestMipmapLinear";
+      break;
+    case EnumType::NearestMipmapNearest:
+      [[fallthrough]];
+    default:
+      return "NearestMipmapNearest";
+      break;
+  }
+}
+
+constexpr bool OpenGl::TryParse(std::string_view str,
+                                GlTextureWrapMode& out) noexcept {
+#define try_enum_value(arg)   \
+  if (str == ToString(arg)) { \
+    out = arg;                \
+    return true;              \
+  }
+
+  using EnumType = std::decay_t<decltype(out)>;
+  static_assert(GetEnumUnderlying(EnumType::Max) == 5U);
+  try_enum_value(EnumType::ClampToBorder);
+  try_enum_value(EnumType::ClampToEdge);
+  try_enum_value(EnumType::MirrorClampToEdge);
+  try_enum_value(EnumType::MirroredRepeat);
+  try_enum_value(EnumType::Repeat);
+  return false;
+#undef try_enum_value
+}
+
+constexpr bool OpenGl::TryParse(std::string_view str,
+                                GlTextureWrap& out) noexcept {
+#define try_enum_value(arg)   \
+  if (str == ToString(arg)) { \
+    out = arg;                \
+    return true;              \
+  }
+
+  using EnumType = std::decay_t<decltype(out)>;
+  static_assert(GetEnumUnderlying(EnumType::Max) == 3U);
+  try_enum_value(EnumType::S);
+  try_enum_value(EnumType::T);
+  try_enum_value(EnumType::R);
+  return false;
+#undef try_enum_value
+}
+
+constexpr bool OpenGl::TryParse(std::string_view str,
+                                GlTextureFilter& out) noexcept {
+#define try_enum_value(arg)   \
+  if (str == ToString(arg)) { \
+    out = arg;                \
+    return true;              \
+  }
+
+  using EnumType = std::decay_t<decltype(out)>;
+  static_assert(GetEnumUnderlying(EnumType::Max) == 6U);
+  try_enum_value(EnumType::Linear);
+  try_enum_value(EnumType::LinearMipmapLinear);
+  try_enum_value(EnumType::LinearMipmapNearest);
+  try_enum_value(EnumType::Nearest);
+  try_enum_value(EnumType::NearestMipmapLinear);
+  try_enum_value(EnumType::NearestMipmapNearest);
+  return false;
+#undef try_enum_value
+}
+
+template <typename T>
+[[nodiscard]] static constexpr T OpenGl::Parse(std::string_view str) {
+  T out;
+  [[likely]] if (TryParse(str, out)) { return out; }
+  throw std::runtime_error(
+      fmt::format("failed to parse enum value from {}", str));
 }

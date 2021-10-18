@@ -1,14 +1,19 @@
-/* Defines:
- *   vec3 cv_abmbient
- *   vec3 cv_specular
- *   vec3 cv_diffuse
- *   float cv_shininess
- */
+struct PointLight {
+    vec3 location;
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+};
 
-uniform sampler2D modelTexture;
-uniform vec3 lightColor;
-uniform vec3 lightLocation;
+struct Material {
+    sampler2D diffuse;
+    vec3 specular;
+    float shininess;
+};
+
 uniform vec3 viewLocation;
+uniform PointLight light;
+uniform Material material;
 
 in vec3 fragmentColor;
 in vec2 fragmentTextureCoordinates;
@@ -20,13 +25,26 @@ out vec4 FragColor;
 void main() {
     vec3 normal = normalize(fragmentNormal);
 
-    vec3 lightDirection = normalize(lightLocation - fragmentLocation);
+    vec3 lightDirection = normalize(light.location - fragmentLocation);
     vec3 viewDirection = normalize(viewLocation - fragmentLocation);
     vec3 reflectDirection = reflect(-lightDirection, normal);
 
-    vec3 diffuse = max(dot(normal, lightDirection), 0.0f) * cv_diffuse;
-    vec3 specular = cv_specular * pow(max(dot(viewDirection, reflectDirection), 0.0f), cv_shininess);
-    
-    vec3 resultColor = (cv_abmbient + diffuse + specular) * lightColor * fragmentColor;
+    vec3 materialDiffuse = vec3(texture(material.diffuse, fragmentTextureCoordinates));
+
+    vec3 ambient = light.ambient * materialDiffuse;
+
+    vec3 diffuse;
+    if (materialDiffuse.x > 0.1) {
+        diffuse = materialDiffuse * light.diffuse;
+        diffuse *= max(dot(normal, lightDirection), 0.0f);
+    }
+    else {
+        diffuse = light.diffuse;
+    }
+
+    vec3 specular = material.specular * light.specular;
+    specular *= pow(max(dot(viewDirection, reflectDirection), 0.0f), material.shininess);
+
+    vec3 resultColor = (ambient + diffuse + specular) * fragmentColor;
     FragColor = vec4(resultColor, 1.0f);
 }

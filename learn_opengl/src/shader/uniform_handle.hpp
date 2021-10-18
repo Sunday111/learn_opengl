@@ -6,6 +6,6 @@
 
 class UniformHandle {
  public:
+  ui32 index = 0;
   Name name;
-  size_t index = 0;
 };

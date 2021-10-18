@@ -13,6 +13,8 @@ class Name {
  public:
   Name() = default;
   Name(const std::string_view& view);
+  Name(const std::string& string);
+  Name(const char* strptr);
 
   std::string_view GetView() const;
 

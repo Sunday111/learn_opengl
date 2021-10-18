@@ -9,7 +9,9 @@ namespace reflection {
 void TypeReflector<PointLightComponent>::ReflectType(TypeHandle handle) {
   handle->name = "PointLightComponent";
   handle->guid = "3E1C9A2F-075C-4673-BBE5-0787A68857C0";
-  handle.Add<&PointLightComponent::color>("color");
+  handle.Add<&PointLightComponent::ambient>("ambient");
+  handle.Add<&PointLightComponent::diffuse>("diffuse");
+  handle.Add<&PointLightComponent::specular>("specular");
   handle.SetBaseClass<Component>();
 }
 }  // namespace reflection

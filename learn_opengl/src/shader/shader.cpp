@@ -15,10 +15,12 @@
 #include "reflection/glm_reflect.hpp"
 #include "reflection/predefined.hpp"
 #include "reflection/reflection.hpp"
+#include "shader/sampler_uniform.hpp"
 #include "shader/shader.hpp"
 #include "shader/shader_define.hpp"
 #include "shader/shader_uniform.hpp"
 #include "template/on_scope_leave.hpp"
+#include "texture/texture.hpp"
 #include "wrap/wrap_imgui.h"
 
 std::filesystem::path Shader::shaders_dir_;
@@ -198,7 +200,7 @@ void Shader::DrawDetails() {
   if (ImGui::TreeNode("Static Variables")) {
     for (ShaderDefine& definition : defines_) {
       bool value_changed = false;
-      SimpleTypeWidget(definition.type_id, definition.name,
+      SimpleTypeWidget(definition.type_id, definition.name.GetView(),
                        definition.value.data(), value_changed);
 
       if (value_changed) {
@@ -211,8 +213,8 @@ void Shader::DrawDetails() {
   if (ImGui::TreeNode("Dynamic Variables")) {
     for (ShaderUniform& uniform : uniforms_) {
       bool value_changed = false;
-      SimpleTypeWidget(uniform.type_id, uniform.name.GetView(),
-                       uniform.value.data(), value_changed);
+      SimpleTypeWidget(uniform.GetType(), uniform.GetName().GetView(),
+                       uniform.GetValue().data(), value_changed);
     }
     ImGui::TreePop();
   }
@@ -226,10 +228,10 @@ std::optional<UniformHandle> Shader::FindUniform(Name name) const noexcept {
   std::optional<UniformHandle> result;
   for (size_t index = 0; index < uniforms_.size(); ++index) {
     const ShaderUniform& uniform = uniforms_[index];
-    if (uniform.name == name) {
+    if (uniform.GetName() == name) {
       UniformHandle h;
       h.name = name;
-      h.index = index;
+      h.index = static_cast<ui32>(index);
       result = h;
       break;
     }
@@ -248,22 +250,28 @@ UniformHandle Shader::GetUniform(Name name) const {
 }
 
 void Shader::SetUniform(UniformHandle& handle, ui32 type_id,
-                        std::span<const ui8> data) {
+                        std::span<const ui8> value) {
   if (handle.index >= uniforms_.size() ||
-      uniforms_[handle.index].name != handle.name) {
+      uniforms_[handle.index].GetName() != handle.name) {
     handle = GetUniform(handle.name);
   }
 
   ShaderUniform& uniform = uniforms_[handle.index];
 
-  [[unlikely]] if (uniform.type_id != type_id ||
-                   uniform.value.size() != data.size()) {
+  [[unlikely]] if (uniform.GetType() != type_id ||
+                   uniform.GetValue().size() != value.size()) {
     throw std::runtime_error(
         "Trying to assign a value of invalid type to uniform");
   }
 
-  assert(uniform.value.size() == data.size());
-  std::copy(data.begin(), data.end(), uniform.value.begin());
+  assert(uniform.GetValue().size() == value.size());
+  reflection::TypeHandle type_handle{uniform.GetType()};
+  type_handle->copy_assign(uniform.GetValue().data(), value.data());
+}
+
+void Shader::SetUniform(UniformHandle& handle,
+                        const std::shared_ptr<Texture>& texture) {
+  SetUniform(handle, SamplerUniform{texture});
 }
 
 void Shader::SendUniforms() {
@@ -277,6 +285,7 @@ void Shader::Check() const {
 }
 
 void Shader::Destroy() {
+  uniforms_.clear();
   if (program_) {
     glDeleteProgram(*program_);
     program_.reset();
@@ -307,6 +316,10 @@ std::optional<ui32> ConvertGlType(GLenum gl_type) {
 
     case GL_FLOAT_MAT4:
       return reflection::GetTypeId<glm::mat4>();
+      break;
+
+    case GL_SAMPLER_2D:
+      return reflection::GetTypeId<SamplerUniform>();
       break;
   }
 
@@ -346,11 +359,14 @@ void Shader::UpdateUniforms() {
     glGetActiveUniform(*program_, i, name_buffer_size, &actual_name_length,
                        &variable_size, &glsl_type, name_buffer);
 
-    const auto variable_name = Name(
-        std::string_view(name_buffer, static_cast<size_t>(actual_name_length)));
+    const std::string_view variable_name_view(
+        name_buffer, static_cast<size_t>(actual_name_length));
+    const Name variable_name(variable_name_view);
 
     const std::optional<ui32> cpp_type = ConvertGlType(glsl_type);
     if (!cpp_type) {
+      spdlog::warn("Skip variable {} in \"{}\" - unsupported type",
+                   variable_name_view, path_.string());
       continue;
     }
 
@@ -359,47 +375,23 @@ void Shader::UpdateUniforms() {
     // find existing variable
     auto found_uniform_it = std::find_if(
         uniforms_.begin(), uniforms_.end(),
-        [&](const ShaderUniform& u) { return u.name == variable_name; });
-
-    auto init_value = [&](ShaderUniform& uniform) {
-      uniform.value.resize(type_handle->size);
-      type_handle->default_constructor(uniform.value.data());
-    };
+        [&](const ShaderUniform& u) { return u.GetName() == variable_name; });
 
     if (found_uniform_it != uniforms_.end()) {
       uniforms.push_back(std::move(*found_uniform_it));
       // the previous value can be saved only if variable has the same type
-      if (*cpp_type != found_uniform_it->type_id) {
-        init_value(uniforms.back());
+      if (*cpp_type != found_uniform_it->GetType()) {
+        uniforms.back().SetType(*cpp_type);
       }
     } else {
       uniforms.emplace_back();
       auto& uniform = uniforms.back();
-      uniform.name = variable_name;
-      init_value(uniforms.back());
+      uniform.SetName(variable_name);
+      uniform.SetType(*cpp_type);
     }
 
-    uniforms.back().location = static_cast<ui32>(i);
-    uniforms.back().type_id = *cpp_type;
+    uniforms.back().SetLocation(static_cast<ui32>(i));
   }
 
   std::swap(uniforms, uniforms_);
-}
-
-void Shader::PrintUniforms() {
-  Check();
-
-  GLint num_uniforms;
-  glGetProgramiv(*program_, GL_ACTIVE_UNIFORMS, &num_uniforms);
-
-  GLchar name[100];
-  for (GLint i = 0; i < num_uniforms; ++i) {
-    GLint strSize;
-    GLenum type;
-    GLsizei length;
-    glGetActiveUniform(*program_, i, sizeof(name), &length, &strSize, &type,
-                       name);
-
-    spdlog::warn("Uniform: {}", name);
-  }
 }

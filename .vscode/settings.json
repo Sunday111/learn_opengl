@@ -95,8 +95,10 @@
         "future": "cpp",
         "csignal": "cpp",
         "valarray": "cpp",
-        "queue": "cpp"
+        "queue": "cpp",
+        "stack": "cpp"
     },
     "cmake.generator": "Ninja",
-    "editor.formatOnSave": true
+    "editor.formatOnSave": true,
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools"
 }

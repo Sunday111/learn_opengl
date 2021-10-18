@@ -1,0 +1,5 @@
+<Type Name="Name" Inheritable="false">
+    <Expand>
+        <Item Name = "Content">{GetView()}</Item>
+    </Expand>
+</Type>

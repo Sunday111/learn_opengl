@@ -23,6 +23,8 @@
 #include "reflection/reflection.hpp"
 #include "shader/shader.hpp"
 #include "template/class_member_traits.hpp"
+#include "texture/texture.hpp"
+#include "texture/texture_manager.hpp"
 #include "window.hpp"
 #include "world.hpp"
 #include "wrap/wrap_glfw.hpp"
@@ -68,21 +70,6 @@ void InitializeGLAD() {
   [[maybe_unused]] static int once = InitializeGLAD_impl();
 }
 
-GLuint LoadTexture(const std::filesystem::path& path) {
-  std::string string_path = path.string();
-  ImageLoader image(string_path);
-
-  const GLuint texture = OpenGl::GenTexture();
-  OpenGl::BindTexture2d(texture);
-
-  size_t lod = 0;
-  OpenGl::TexImage2d(GL_TEXTURE_2D, lod, GL_RGB, image.GetWidth(),
-                     image.GetHeight(), GL_RGBA, GL_UNSIGNED_BYTE,
-                     image.GetData().data());
-  OpenGl::GenerateMipmap2d();
-  return texture;
-}
-
 template <bool force = false>
 void UpdateProperties(const ProgramProperties& p) noexcept {
   auto check_prop = [&](auto index, auto fn) { p.OnChange<force>(index, fn); };
@@ -106,6 +93,19 @@ void UpdateProperties(const ProgramProperties& p) noexcept {
   check_prop(p.min_filter, OpenGl::SetTexture2dMinFilter);
   check_prop(p.mag_filter, OpenGl::SetTexture2dMagFilter);
 }
+
+struct MaterialUniform {
+  UniformHandle diffuse;
+  UniformHandle specular;
+  UniformHandle shininess;
+};
+
+struct PointLightUniform {
+  UniformHandle location;
+  UniformHandle ambient;
+  UniformHandle diffuse;
+  UniformHandle specular;
+};
 
 int main([[maybe_unused]] int argc, char** argv) {
   try {
@@ -134,6 +134,8 @@ int main([[maybe_unused]] int argc, char** argv) {
     windows.front()->MakeContextCurrent();
     InitializeGLAD();
 
+    TextureManager texture_manager(textures_dir);
+
     GlDebugMessenger::Start();
     OpenGl::EnableDepthTest();
 
@@ -146,14 +148,27 @@ int main([[maybe_unused]] int argc, char** argv) {
     ProgramProperties properties;
     ParametersWidget widget(&properties);
     auto shader = std::make_shared<Shader>("simple.shader.json");
+    auto texture = texture_manager.GetTexture("container.texture.json");
 
-    auto model_uniform = shader->GetUniform(Name("model"));
-    auto view_uniform = shader->GetUniform(Name("view"));
-    auto view_location_uniform = shader->GetUniform(Name("viewLocation"));
-    auto projection_uniform = shader->GetUniform(Name("projection"));
-    auto light_color_uniform = shader->GetUniform(Name("lightColor"));
-    auto light_location_uniform = shader->GetUniform(Name("lightLocation"));
-    const GLuint texture = LoadTexture(textures_dir / "viking_room.png");
+    MaterialUniform material_uniform;
+    material_uniform.diffuse = shader->GetUniform("material.diffuse");
+    material_uniform.specular = shader->GetUniform("material.specular");
+    material_uniform.shininess = shader->GetUniform("material.shininess");
+
+    shader->SetUniform(material_uniform.diffuse, texture);
+    shader->SetUniform(material_uniform.specular, glm::vec3(0.5f, 0.5f, 0.5f));
+    shader->SetUniform(material_uniform.shininess, 32.0f);
+
+    PointLightUniform light_uniform;
+    light_uniform.location = shader->GetUniform("light.location");
+    light_uniform.ambient = shader->GetUniform("light.ambient");
+    light_uniform.diffuse = shader->GetUniform("light.diffuse");
+    light_uniform.specular = shader->GetUniform("light.specular");
+
+    auto model_uniform = shader->GetUniform("model");
+    auto view_uniform = shader->GetUniform("view");
+    auto view_location_uniform = shader->GetUniform("viewLocation");
+    auto projection_uniform = shader->GetUniform("projection");
 
     World world;
 
@@ -164,7 +179,9 @@ int main([[maybe_unused]] int argc, char** argv) {
       point_light.SetName("PointLight");
       PointLightComponent& light =
           point_light.AddComponent<PointLightComponent>();
-      light.color = light_color;
+      light.diffuse = light_color;
+      light.ambient = light_color * 0.1f;
+      light.specular = glm::vec3(1.0f, 1.0f, 1.0f);
       MeshComponent& mesh = point_light.AddComponent<MeshComponent>();
       mesh.MakeCube(0.2f, light_color, shader);
       TransformComponent& transform =
@@ -262,6 +279,7 @@ int main([[maybe_unused]] int argc, char** argv) {
         // Rendering
         ImGui::Render();
 
+        shader->Use();
         shader->SetUniform(view_uniform, window->GetView());
         shader->SetUniform(view_location_uniform, window->GetCamera()->eye);
         shader->SetUniform(projection_uniform, window->GetProjection());
@@ -274,12 +292,17 @@ int main([[maybe_unused]] int argc, char** argv) {
               const float a = 0.0f;
               l = glm::rotate(l, a, glm::vec3(0.0f, 0.0f, 1.0f));
               tr[3] = l;
-              shader->SetUniform(light_location_uniform, glm::vec3(l));
+              shader->SetUniform(light_uniform.location, glm::vec3(l));
             });
 
         point_light.ForEachComp<PointLightComponent>(
             [&](PointLightComponent& light_component) {
-              shader->SetUniform(light_color_uniform, light_component.color);
+              shader->SetUniform(light_uniform.diffuse,
+                                 light_component.diffuse);
+              shader->SetUniform(light_uniform.specular,
+                                 light_component.specular);
+              shader->SetUniform(light_uniform.ambient,
+                                 light_component.ambient);
             });
 
         world.ForEachEntity([&](Entity& entity) {
@@ -290,8 +313,17 @@ int main([[maybe_unused]] int argc, char** argv) {
               });
 
           shader->SendUniforms();
-          entity.ForEachComp<MeshComponent>(
-              [&](MeshComponent& mesh_component) { mesh_component.Draw(); });
+          entity.ForEachComp<MeshComponent>([&](MeshComponent& mesh_component) {
+            glActiveTexture(GL_TEXTURE0);
+            ui32 tex_handle = texture->GetHandle();
+            glBindTexture(GL_TEXTURE_2D, tex_handle);
+            ui32 ul = shader->GetUniformLocation("material.diffuse");
+            glUniform1i(ul, 0);
+            mesh_component.Draw();
+          });
+
+          static int k = 0;
+          ++k;
         });
         OpenGl::BindVertexArray(0);
 

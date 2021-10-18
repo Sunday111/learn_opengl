@@ -19,9 +19,14 @@ set(dst_shaders_dir  ${CMAKE_CURRENT_BINARY_DIR}/${shaders_dir_rel})
 set(dst_textures_dir ${CMAKE_CURRENT_BINARY_DIR}/${textures_dir_rel})
 set(dst_models_dir ${CMAKE_CURRENT_BINARY_DIR}/${models_dir_rel})
 
+file(GLOB_RECURSE headers_list "${target_src_root}/*.hpp")
 file(GLOB_RECURSE sources_list "${target_src_root}/*.cpp")
 
-add_executable(${target_name} ${sources_list})
+add_executable( ${target_name}
+	${headers_list}
+	${sources_list}
+	"${CMAKE_CURRENT_SOURCE_DIR}/learn_opengl.natvis")
+
 target_link_libraries(${target_name}
 	stb
 	glad

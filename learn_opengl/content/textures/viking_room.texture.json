@@ -1,0 +1,12 @@
+{
+    "image": "viking_room.png",
+    "wrap": {
+        "S": "ClampToEdge",
+        "T": "ClampToEdge",
+        "R": "ClampToEdge"
+    },
+    "filter": {
+        "min": "LinearMipmapLinear",
+        "mag": "Linear"
+    }
+}

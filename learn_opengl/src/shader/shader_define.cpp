@@ -30,7 +30,7 @@ std::string ShaderDefine::GenDefine() const {
     value_str = fmt::format("vec3({}, {}, {})", vec.x, vec.y, vec.z);
   }
 
-  return fmt::format("#define {} {}\n", name, value_str);
+  return fmt::format("#define {} {}\n", name.GetView(), value_str);
 }
 
 void ShaderDefine::MoveFrom(ShaderDefine& another) {
@@ -56,7 +56,7 @@ inline static std::span<const ui8> MakeValueSpan(const T& value) noexcept {
 
 ShaderDefine ShaderDefine::ReadFromJson(const nlohmann::json& json) {
   ShaderDefine def;
-  def.name = json.at("name");
+  def.name = std::string(json.at("name"));
 
   auto& default_value_json = json.at("default");
   std::string type_name = json.at("type");

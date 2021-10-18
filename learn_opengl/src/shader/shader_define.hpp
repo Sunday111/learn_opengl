@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "integer.hpp"
+#include "name_cache/name.hpp"
 #include "nlohmann/json.hpp"
 
 class ShaderDefine {
@@ -25,7 +26,7 @@ class ShaderDefine {
   ShaderDefine() = default;
 
  public:
-  std::string name;
   std::vector<ui8> value;
+  Name name;
   ui32 type_id;
 };

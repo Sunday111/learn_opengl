@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <memory>
 #include <optional>
 #include <span>
 #include <string_view>
@@ -13,6 +14,7 @@
 
 class ShaderDefine;
 class ShaderUniform;
+class Texture;
 
 class Shader {
  public:
@@ -25,13 +27,15 @@ class Shader {
   [[nodiscard]] std::optional<ui32> FindUniformLocation(
       const char*) const noexcept;
   [[nodiscard]] ui32 GetUniformLocation(const char*) const noexcept;
-  void PrintUniforms();
   void DrawDetails();
 
   std::optional<UniformHandle> FindUniform(Name name) const noexcept;
   UniformHandle GetUniform(Name name) const;
   void SetUniform(UniformHandle& handle, ui32 type_id,
                   std::span<const ui8> data);
+
+  void SetUniform(UniformHandle& handle,
+                  const std::shared_ptr<Texture>& texture);
 
   template <typename T>
   void SetUniform(UniformHandle& handle, const T& value) {

@@ -4,6 +4,10 @@
 
 #include "name_cache/name_cache.hpp"
 
+Name::Name(const char* strptr) : Name(std::string_view(strptr)) {}
+
+Name::Name(const std::string& string) : Name(std::string_view(string)) {}
+
 Name::Name(const std::string_view& view) {
   using namespace name_cache_impl;
   id_ = NameCache::Get().GetId(view);
