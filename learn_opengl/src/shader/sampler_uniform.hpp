@@ -8,6 +8,7 @@
 
 class SamplerUniform {
  public:
+  ui8 sampler_index;
   std::shared_ptr<Texture> texture;
 };
 

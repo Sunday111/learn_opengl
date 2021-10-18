@@ -148,15 +148,18 @@ int main([[maybe_unused]] int argc, char** argv) {
     ProgramProperties properties;
     ParametersWidget widget(&properties);
     auto shader = std::make_shared<Shader>("simple.shader.json");
-    auto texture = texture_manager.GetTexture("container.texture.json");
+    auto container_diffuse =
+        texture_manager.GetTexture("container.texture.json");
+    auto container_specular =
+        texture_manager.GetTexture("container_specular.texture.json");
 
     MaterialUniform material_uniform;
     material_uniform.diffuse = shader->GetUniform("material.diffuse");
     material_uniform.specular = shader->GetUniform("material.specular");
     material_uniform.shininess = shader->GetUniform("material.shininess");
 
-    shader->SetUniform(material_uniform.diffuse, texture);
-    shader->SetUniform(material_uniform.specular, glm::vec3(0.5f, 0.5f, 0.5f));
+    shader->SetUniform(material_uniform.diffuse, container_diffuse);
+    shader->SetUniform(material_uniform.specular, container_specular);
     shader->SetUniform(material_uniform.shininess, 32.0f);
 
     PointLightUniform light_uniform;
@@ -169,6 +172,7 @@ int main([[maybe_unused]] int argc, char** argv) {
     auto view_uniform = shader->GetUniform("view");
     auto view_location_uniform = shader->GetUniform("viewLocation");
     auto projection_uniform = shader->GetUniform("projection");
+    auto tex_multiplier_uniform = shader->GetUniform("texCoordMultiplier");
 
     World world;
 
@@ -204,8 +208,6 @@ int main([[maybe_unused]] int argc, char** argv) {
       auto& entity = world.SpawnEntity<Entity>();
       entity.SetName("mesh");
       MeshComponent& mesh = entity.AddComponent<MeshComponent>();
-      // mesh.Create((models_dir / "viking_room.obj").string(), texture,
-      // shader);
       const glm::vec3 cube_color(1.0f, 1.0f, 1.0f);
       mesh.MakeCube(1.0f, cube_color, shader);  //
       entity.AddComponent<TransformComponent>();
@@ -213,6 +215,7 @@ int main([[maybe_unused]] int argc, char** argv) {
 
     UpdateProperties<true>(properties);
     shader->Use();
+    shader->SetUniform(tex_multiplier_uniform, glm::vec2{1.0f, 1.0f});
 
     auto prev_frame_time = std::chrono::high_resolution_clock::now();
 
@@ -313,14 +316,8 @@ int main([[maybe_unused]] int argc, char** argv) {
               });
 
           shader->SendUniforms();
-          entity.ForEachComp<MeshComponent>([&](MeshComponent& mesh_component) {
-            glActiveTexture(GL_TEXTURE0);
-            ui32 tex_handle = texture->GetHandle();
-            glBindTexture(GL_TEXTURE_2D, tex_handle);
-            ui32 ul = shader->GetUniformLocation("material.diffuse");
-            glUniform1i(ul, 0);
-            mesh_component.Draw();
-          });
+          entity.ForEachComp<MeshComponent>(
+              [&](MeshComponent& mesh_component) { mesh_component.Draw(); });
 
           static int k = 0;
           ++k;

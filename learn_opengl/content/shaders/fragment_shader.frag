@@ -7,7 +7,7 @@ struct PointLight {
 
 struct Material {
     sampler2D diffuse;
-    vec3 specular;
+    sampler2D specular;
     float shininess;
 };
 
@@ -30,19 +30,19 @@ void main() {
     vec3 reflectDirection = reflect(-lightDirection, normal);
 
     vec3 materialDiffuse = vec3(texture(material.diffuse, fragmentTextureCoordinates));
+    vec3 materialSpecular = vec3(texture(material.specular, fragmentTextureCoordinates));
 
     vec3 ambient = light.ambient * materialDiffuse;
 
     vec3 diffuse;
-    if (materialDiffuse.x > 0.1) {
+    if (materialDiffuse.x < 0.01f) {
         diffuse = materialDiffuse * light.diffuse;
         diffuse *= max(dot(normal, lightDirection), 0.0f);
-    }
-    else {
-        diffuse = light.diffuse;
+    } else {
+        diffuse = materialDiffuse;
     }
 
-    vec3 specular = material.specular * light.specular;
+    vec3 specular = materialSpecular * light.specular;
     specular *= pow(max(dot(viewDirection, reflectDirection), 0.0f), material.shininess);
 
     vec3 resultColor = (ambient + diffuse + specular) * fragmentColor;

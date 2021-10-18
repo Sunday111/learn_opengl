@@ -27,10 +27,12 @@ struct ValueTypeHelper<SamplerUniform> {
     if (type_id == reflection::GetTypeId<SamplerUniform>()) {
       auto& v = *reinterpret_cast<const SamplerUniform*>(value.data());
       const auto texture_handle = v.texture->GetHandle();
-      glActiveTexture(GL_TEXTURE0);
-      OpenGl::BindTexture2d(texture_handle);
-      // OpenGl::SetUniform(location, 0);
-      glUniform1i(location, 0);
+
+      static_assert(GL_TEXTURE31 - GL_TEXTURE0 == 31);
+      glActiveTexture(static_cast<GLenum>(GL_TEXTURE0 + v.sampler_index));
+      glBindTexture(GL_TEXTURE_2D, texture_handle);
+      glUniform1i(location, v.sampler_index);
+
       return true;
     }
 
@@ -83,6 +85,13 @@ void ShaderUniform::SetType(ui32 type_id) {
   type_id_ = type_id;
   value_.resize(type_info->size);
   type_info->default_constructor(value_.data());
+}
+
+void ShaderUniform::EnsureTypeMatch(ui32 type_id) const {
+  [[unlikely]] if (GetType() != type_id) {
+    throw std::runtime_error(
+        "Trying to assign a value of invalid type to uniform");
+  }
 }
 
 bool ShaderUniform::IsEmpty() const noexcept { return value_.empty(); }

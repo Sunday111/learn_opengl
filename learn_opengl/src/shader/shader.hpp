@@ -46,6 +46,22 @@ class Shader {
 
   void SendUniforms();
 
+ protected:
+  ShaderUniform& GetUniform(UniformHandle& handle);
+  const ShaderUniform& GetUniform(UniformHandle& handle) const;
+  std::span<ui8> GetUniformValueViewRaw(UniformHandle& handle, ui32 type_id);
+  std::span<const ui8> GetUniformValueViewRaw(UniformHandle& handle,
+                                              ui32 type_id) const;
+  void UpdateUniformHandle(UniformHandle& handle) const;
+
+  template <typename T>
+  T& GetUniformValue(UniformHandle& handle) {
+    std::span<ui8> view =
+        GetUniformValueViewRaw(handle, reflection::GetTypeId<T>());
+    assert(view.size() == sizeof(T));
+    return *reinterpret_cast<T*>(view.data());
+  }
+
  private:
   void Check() const;
   void Destroy();

@@ -90,7 +90,7 @@ void RegisterAttribute(GLuint location, bool normalized) {
 }
 
 void MeshComponent::Create(const std::span<const Vertex>& vertices,
-                           const std::span<const ui32>& indices, GLuint texture,
+                           const std::span<const ui32>& indices,
                            const std::shared_ptr<Shader>& shader) {
   vao_ = OpenGl::GenVertexArray();
   vbo_ = OpenGl::GenBuffer();
@@ -115,16 +115,23 @@ void MeshComponent::Create(const std::span<const Vertex>& vertices,
   RegisterAttribute<&Vertex::normal>(location++, false);
 
   shader_ = shader;
-  texture_ = texture;
   num_indices_ = indices.size();
+}
+
+constexpr std::array<ui32, 6> get_square_indices(bool clockwise) {
+  if (clockwise) {
+    return {0, 1, 2, 3, 2, 1};
+  } else {
+    return {2, 1, 0, 1, 2, 3};
+  }
 }
 
 void MeshComponent::MakeCube(float width, const glm::vec3& color,
                              const std::shared_ptr<Shader>& shader) {
   std::vector<Vertex> vertices;
   std::vector<ui32> indices;
-  GLuint texture = 0;
   const float half_width = width / 2.0f;
+  constexpr bool clockwise = true;
 
   /* 0 ---- 1
    * |    / |
@@ -136,16 +143,18 @@ void MeshComponent::MakeCube(float width, const glm::vec3& color,
   using v3f = glm::vec3;
   using v2f = glm::vec2;
 
+  v2f tc[4]{v2f{0.0f, 0.0f}, v2f{0.0f, 1.0f}, v2f{1.0f, 0.0f}, v2f{1.0f, 1.0f}};
   auto make_side_pos = [](size_t index, const v3f& x, const v3f& y) -> v3f {
     auto tx = index % 2 ? x : -x;
     auto ty = index / 2 ? y : -y;
     return tx + ty;
   };
-  auto make_side_tex_coord = [](size_t index) -> v2f {
-    return v2f{index % 2 ? 0.0f : 1.0f, index / 2 ? 1.0f : 0.0f};
+  auto make_side_tex_coord = [&](size_t index) -> v2f {
+    // return v2f{index % 2 ? 0.0f : 1.0f, index / 2 ? 1.0f : 0.0f};
+    return tc[index];
   };
 
-  constexpr std::array<ui32, 6> side_indices{2, 1, 0, 1, 2, 3};
+  constexpr std::array<ui32, 6> side_indices = get_square_indices(clockwise);
 
   auto add_side = [&](const v3f& x, const v3f& y, const v3f z) {
     Vertex v;
@@ -174,13 +183,12 @@ void MeshComponent::MakeCube(float width, const glm::vec3& color,
   add_side(x, -z, y);
   add_side(x, z, -y);
 
-  Create(vertices, indices, texture, shader);
+  Create(vertices, indices, shader);
 }
 
 void MeshComponent::Draw() {
   shader_->Use();
   OpenGl::BindVertexArray(vao_);
-  OpenGl::BindTexture2d(texture_);
   OpenGl::DrawElements(GL_TRIANGLES, num_indices_, GL_UNSIGNED_INT, nullptr);
 }
 
@@ -191,10 +199,10 @@ void MeshComponent::DrawDetails() {
   }
 }
 
-void MeshComponent::Create(const std::string& path, GLuint texture,
+void MeshComponent::Create(const std::string& path,
                            const std::shared_ptr<Shader>& shader) {
   std::vector<Vertex> vertices;
   std::vector<ui32> indices;
   LoadModel(path, vertices, indices);
-  Create(vertices, indices, texture, shader);
+  Create(vertices, indices, shader);
 }

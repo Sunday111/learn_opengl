@@ -22,11 +22,10 @@ class MeshComponent : public SimpleComponentBase<MeshComponent> {
   MeshComponent();
   ~MeshComponent();
 
-  void Create(const std::string& path, GLuint texture,
-              const std::shared_ptr<Shader>& shader);
+  void Create(const std::string& path, const std::shared_ptr<Shader>& shader);
 
   void Create(const std::span<const Vertex>& vertices,
-              const std::span<const ui32>& indices, GLuint texture,
+              const std::span<const ui32>& indices,
               const std::shared_ptr<Shader>& shader);
 
   void MakeCube(float width, const glm::vec3& color,
@@ -42,7 +41,6 @@ class MeshComponent : public SimpleComponentBase<MeshComponent> {
   GLuint vao_;  // vertex array object
   GLuint vbo_;  // vertex buffer object
   GLuint ebo_;  // element buffer object
-  GLuint texture_ = 0;
 };
 
 namespace reflection {

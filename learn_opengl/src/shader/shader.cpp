@@ -249,29 +249,49 @@ UniformHandle Shader::GetUniform(Name name) const {
       fmt::format("Uniform is not found: \"{}\"", name.GetView()));
 }
 
-void Shader::SetUniform(UniformHandle& handle, ui32 type_id,
-                        std::span<const ui8> value) {
+ShaderUniform& Shader::GetUniform(UniformHandle& handle) {
+  UpdateUniformHandle(handle);
+  return uniforms_[handle.index];
+}
+
+const ShaderUniform& Shader::GetUniform(UniformHandle& handle) const {
+  UpdateUniformHandle(handle);
+  return uniforms_[handle.index];
+}
+
+std::span<ui8> Shader::GetUniformValueViewRaw(UniformHandle& handle,
+                                              ui32 type_id) {
+  auto& uniform = GetUniform(handle);
+  uniform.EnsureTypeMatch(type_id);
+  return uniform.GetValue();
+}
+
+std::span<const ui8> Shader::GetUniformValueViewRaw(UniformHandle& handle,
+                                                    ui32 type_id) const {
+  auto& uniform = GetUniform(handle);
+  uniform.EnsureTypeMatch(type_id);
+  return uniform.GetValue();
+}
+
+void Shader::UpdateUniformHandle(UniformHandle& handle) const {
   if (handle.index >= uniforms_.size() ||
       uniforms_[handle.index].GetName() != handle.name) {
     handle = GetUniform(handle.name);
   }
+}
 
-  ShaderUniform& uniform = uniforms_[handle.index];
-
-  [[unlikely]] if (uniform.GetType() != type_id ||
-                   uniform.GetValue().size() != value.size()) {
-    throw std::runtime_error(
-        "Trying to assign a value of invalid type to uniform");
-  }
-
-  assert(uniform.GetValue().size() == value.size());
+void Shader::SetUniform(UniformHandle& handle, ui32 type_id,
+                        std::span<const ui8> value) {
+  auto& uniform = GetUniform(handle);
+  uniform.EnsureTypeMatch(type_id);
   reflection::TypeHandle type_handle{uniform.GetType()};
   type_handle->copy_assign(uniform.GetValue().data(), value.data());
 }
 
 void Shader::SetUniform(UniformHandle& handle,
                         const std::shared_ptr<Texture>& texture) {
-  SetUniform(handle, SamplerUniform{texture});
+  auto& sampler_uniform = GetUniformValue<SamplerUniform>(handle);
+  sampler_uniform.texture = texture;
 }
 
 void Shader::SendUniforms() {
@@ -394,4 +414,13 @@ void Shader::UpdateUniforms() {
   }
 
   std::swap(uniforms, uniforms_);
+
+  for (size_t i = 0; i < uniforms_.size(); ++i) {
+    const ShaderUniform& uniform = uniforms_[i];
+    if (uniform.GetType() == reflection::GetTypeId<SamplerUniform>()) {
+      UniformHandle handle{static_cast<ui32>(i), uniform.GetName()};
+      auto& sampler = GetUniformValue<SamplerUniform>(handle);
+      sampler.sampler_index = static_cast<ui8>(i);
+    }
+  }
 }

@@ -1,0 +1,12 @@
+{
+    "image": "container_specular.png",
+    "wrap": {
+        "S": "ClampToEdge",
+        "T": "ClampToEdge",
+        "R": "ClampToEdge"
+    },
+    "filter": {
+        "min": "LinearMipmapLinear",
+        "mag": "Linear"
+    }
+}
