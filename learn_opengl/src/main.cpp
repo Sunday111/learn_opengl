@@ -8,8 +8,10 @@
 #include <vector>
 
 #include "components/camera_component.hpp"
+#include "components/lights/directional_light_component.hpp"
+#include "components/lights/point_light_component.hpp"
+#include "components/lights/spot_light_component.hpp"
 #include "components/mesh_component.hpp"
-#include "components/point_light_component.hpp"
 #include "components/transform_component.hpp"
 #include "debug/gl_debug_messenger.hpp"
 #include "entities/entity.hpp"
@@ -100,12 +102,154 @@ struct MaterialUniform {
   UniformHandle shininess;
 };
 
+auto GetMaterialUniform(Shader& s) {
+  MaterialUniform u;
+  u.diffuse = s.GetUniform("material.diffuse");
+  u.specular = s.GetUniform("material.specular");
+  u.shininess = s.GetUniform("material.shininess");
+  return u;
+}
+
 struct PointLightUniform {
   UniformHandle location;
   UniformHandle ambient;
   UniformHandle diffuse;
   UniformHandle specular;
+  UniformHandle constant;
+  UniformHandle linear;
+  UniformHandle quadratic;
 };
+
+auto GetPointLightUniform(Shader& s) {
+  PointLightUniform u;
+  u.location = s.GetUniform("pointLight.location");
+  u.ambient = s.GetUniform("pointLight.ambient");
+  u.diffuse = s.GetUniform("pointLight.diffuse");
+  u.specular = s.GetUniform("pointLight.specular");
+  u.constant = s.GetUniform("pointLight.attenuation.constant");
+  u.linear = s.GetUniform("pointLight.attenuation.linear");
+  u.quadratic = s.GetUniform("pointLight.attenuation.quadratic");
+  return u;
+}
+
+struct DirectionalLightUniform {
+  UniformHandle direction;
+  UniformHandle ambient;
+  UniformHandle diffuse;
+  UniformHandle specular;
+};
+
+auto GetDirectionalLightUniform(Shader& s) {
+  DirectionalLightUniform u;
+  u.direction = s.GetUniform("directionalLight.direction");
+  u.ambient = s.GetUniform("directionalLight.ambient");
+  u.diffuse = s.GetUniform("directionalLight.diffuse");
+  u.specular = s.GetUniform("directionalLight.specular");
+  return u;
+}
+
+struct SpotLightUniform {
+  UniformHandle location;
+  UniformHandle direction;
+  UniformHandle diffuse;
+  UniformHandle specular;
+  UniformHandle innerAngle;
+  UniformHandle outerAngle;
+  UniformHandle constant;
+  UniformHandle linear;
+  UniformHandle quadratic;
+};
+
+auto GetSpotLightUniform(Shader& s) {
+  SpotLightUniform u;
+  u.location = s.GetUniform("spotLight.location");
+  u.direction = s.GetUniform("spotLight.direction");
+  u.diffuse = s.GetUniform("spotLight.diffuse");
+  u.specular = s.GetUniform("spotLight.specular");
+  u.innerAngle = s.GetUniform("spotLight.innerAngle");
+  u.outerAngle = s.GetUniform("spotLight.outerAngle");
+  u.constant = s.GetUniform("spotLight.attenuation.constant");
+  u.linear = s.GetUniform("spotLight.attenuation.linear");
+  u.quadratic = s.GetUniform("spotLight.attenuation.quadratic");
+  return u;
+}
+
+void ApplyUniforms(PointLightUniform& u, Shader& s, Entity& e) {
+  e.ForEachComp<TransformComponent>(
+      [&](TransformComponent& transform_component) {
+        auto l = transform_component.transform[3];
+        s.SetUniform(u.location, glm::vec3(l));
+      });
+
+  e.ForEachComp<PointLightComponent>([&](PointLightComponent& light) {
+    s.SetUniform(u.ambient, light.ambient);
+    s.SetUniform(u.diffuse, light.diffuse);
+    s.SetUniform(u.specular, light.specular);
+    s.SetUniform(u.constant, light.attenuation.constant);
+    s.SetUniform(u.linear, light.attenuation.linear);
+    s.SetUniform(u.quadratic, light.attenuation.quadratic);
+  });
+}
+
+void ApplyUniforms(SpotLightUniform& u, Shader& s, Entity& e) {
+  e.ForEachComp<TransformComponent>(
+      [&](TransformComponent& transform_component) {
+        auto& tr = transform_component.transform;
+        glm::vec3 dir(0.0f, 0.0f, -1.0f);
+        s.SetUniform(u.location, glm::vec3(tr[3]));
+        s.SetUniform(u.direction, dir * glm::mat3(tr));
+      });
+
+  e.ForEachComp<SpotLightComponent>([&](SpotLightComponent& light) {
+    s.SetUniform(u.diffuse, light.diffuse);
+    s.SetUniform(u.specular, light.specular);
+    s.SetUniform(u.innerAngle, light.innerAngle);
+    s.SetUniform(u.outerAngle, light.outerAngle);
+    s.SetUniform(u.constant, light.attenuation.constant);
+    s.SetUniform(u.linear, light.attenuation.linear);
+    s.SetUniform(u.quadratic, light.attenuation.quadratic);
+  });
+}
+
+void ApplyUniforms(DirectionalLightUniform& u, Shader& s, Entity& e) {
+  e.ForEachComp<TransformComponent>(
+      [&](TransformComponent& transform_component) {
+        auto& tr = transform_component.transform;
+        glm::vec3 dir(1.0f, 0.0f, 0.0f);
+        dir = dir * glm::mat3(tr);
+        s.SetUniform(u.direction, dir);
+      });
+
+  e.ForEachComp<DirectionalLightComponent>(
+      [&](DirectionalLightComponent& light_component) {
+        s.SetUniform(u.ambient, light_component.ambient);
+        s.SetUniform(u.diffuse, light_component.diffuse);
+        s.SetUniform(u.specular, light_component.specular);
+      });
+}
+
+void CreateMeshes(World& world, const std::shared_ptr<Shader>& shader) {
+  constexpr float width = 15.0f;
+  constexpr float height = 15.0f;
+  constexpr size_t nx = 10;
+  constexpr size_t ny = 10;
+
+  // Create entity with mesh component
+  for (size_t x = 0; x < nx; ++x) {
+    for (size_t y = 0; y < ny; ++y) {
+      auto& entity = world.SpawnEntity<Entity>();
+      entity.SetName(fmt::format("mesh [x:{}, y:{}]", x, y));
+      MeshComponent& mesh = entity.AddComponent<MeshComponent>();
+      const glm::vec3 cube_color(1.0f, 1.0f, 1.0f);
+      mesh.MakeCube(1.0f, cube_color, shader);  //
+      auto& t = entity.AddComponent<TransformComponent>();
+
+      auto position = glm::vec3((x * width / nx) - (width / 2),
+                                (y * height / ny) - (height / 2), 0.0f);
+      t.transform = glm::translate(t.transform, position);
+    }
+  }
+}
 
 int main([[maybe_unused]] int argc, char** argv) {
   try {
@@ -153,20 +297,14 @@ int main([[maybe_unused]] int argc, char** argv) {
     auto container_specular =
         texture_manager.GetTexture("container_specular.texture.json");
 
-    MaterialUniform material_uniform;
-    material_uniform.diffuse = shader->GetUniform("material.diffuse");
-    material_uniform.specular = shader->GetUniform("material.specular");
-    material_uniform.shininess = shader->GetUniform("material.shininess");
+    auto material_uniform = GetMaterialUniform(*shader);
+    auto point_light_uniform = GetPointLightUniform(*shader);
+    auto directional_light_uniform = GetDirectionalLightUniform(*shader);
+    auto spot_light_uniform = GetSpotLightUniform(*shader);
 
     shader->SetUniform(material_uniform.diffuse, container_diffuse);
     shader->SetUniform(material_uniform.specular, container_specular);
     shader->SetUniform(material_uniform.shininess, 32.0f);
-
-    PointLightUniform light_uniform;
-    light_uniform.location = shader->GetUniform("light.location");
-    light_uniform.ambient = shader->GetUniform("light.ambient");
-    light_uniform.diffuse = shader->GetUniform("light.diffuse");
-    light_uniform.specular = shader->GetUniform("light.specular");
 
     auto model_uniform = shader->GetUniform("model");
     auto view_uniform = shader->GetUniform("view");
@@ -194,6 +332,40 @@ int main([[maybe_unused]] int argc, char** argv) {
           glm::translate(transform.transform, glm::vec3(1.0f, 1.0f, 1.0f));
     }
 
+    // Create entity with directional light component
+    Entity& directional_light = world.SpawnEntity<Entity>();
+    {
+      const glm::vec3 light_color(1.0f, 1.0f, 1.0f);
+      directional_light.SetName("DirectionalLight");
+      auto& light = directional_light.AddComponent<DirectionalLightComponent>();
+      light.diffuse = light_color;
+      light.ambient = light_color * 0.1f;
+      light.specular = light_color;
+
+      auto& transform = directional_light.AddComponent<TransformComponent>();
+      transform.transform = glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f),   // eye
+                                        glm::vec3(0.0f, 0.0f, 5.0f),   // center
+                                        glm::vec3(0.0f, 0.0f, 1.0f));  // up?
+    }
+
+    // Create entity with spot light component
+    Entity& spot_light = world.SpawnEntity<Entity>();
+    {
+      const glm::vec3 light_color(1.0f, 1.0f, 1.0f);
+      spot_light.SetName("SpotLight");
+      auto& light = spot_light.AddComponent<SpotLightComponent>();
+      light.diffuse = light_color;
+      light.specular = light_color;
+      light.innerAngle = glm::cos(glm::radians(12.5f));
+      light.outerAngle = glm::cos(glm::radians(15.0f));
+
+      auto& transform = spot_light.AddComponent<TransformComponent>();
+      transform.transform =
+          glm::translate(transform.transform, glm::vec3(0.0f, 0.0, 1.0f));
+      transform.transform *= glm::yawPitchRoll(
+          glm::radians(0.0f), glm::radians(-90.0f), glm::radians(0.0f));
+    }
+
     // Create entity with camera component and link it with window
     {
       auto& entity = world.SpawnEntity<Entity>();
@@ -203,18 +375,11 @@ int main([[maybe_unused]] int argc, char** argv) {
       entity.AddComponent<TransformComponent>();
     }
 
-    // Create entity with mesh component
-    {
-      auto& entity = world.SpawnEntity<Entity>();
-      entity.SetName("mesh");
-      MeshComponent& mesh = entity.AddComponent<MeshComponent>();
-      const glm::vec3 cube_color(1.0f, 1.0f, 1.0f);
-      mesh.MakeCube(1.0f, cube_color, shader);  //
-      entity.AddComponent<TransformComponent>();
-    }
+    CreateMeshes(world, shader);
 
     UpdateProperties<true>(properties);
     shader->Use();
+
     shader->SetUniform(tex_multiplier_uniform, glm::vec2{1.0f, 1.0f});
 
     auto prev_frame_time = std::chrono::high_resolution_clock::now();
@@ -283,30 +448,14 @@ int main([[maybe_unused]] int argc, char** argv) {
         ImGui::Render();
 
         shader->Use();
+
+        ApplyUniforms(point_light_uniform, *shader, point_light);
+        ApplyUniforms(directional_light_uniform, *shader, directional_light);
+        ApplyUniforms(spot_light_uniform, *shader, spot_light);
+
         shader->SetUniform(view_uniform, window->GetView());
         shader->SetUniform(view_location_uniform, window->GetCamera()->eye);
         shader->SetUniform(projection_uniform, window->GetProjection());
-
-        point_light.ForEachComp<TransformComponent>(
-            [&](TransformComponent& transform_component) {
-              auto& tr = transform_component.transform;
-              auto l = tr[3];
-              // const float a = glm::radians(90.0f) * frame_delta_time;
-              const float a = 0.0f;
-              l = glm::rotate(l, a, glm::vec3(0.0f, 0.0f, 1.0f));
-              tr[3] = l;
-              shader->SetUniform(light_uniform.location, glm::vec3(l));
-            });
-
-        point_light.ForEachComp<PointLightComponent>(
-            [&](PointLightComponent& light_component) {
-              shader->SetUniform(light_uniform.diffuse,
-                                 light_component.diffuse);
-              shader->SetUniform(light_uniform.specular,
-                                 light_component.specular);
-              shader->SetUniform(light_uniform.ambient,
-                                 light_component.ambient);
-            });
 
         world.ForEachEntity([&](Entity& entity) {
           entity.ForEachComp<TransformComponent>(
@@ -318,9 +467,6 @@ int main([[maybe_unused]] int argc, char** argv) {
           shader->SendUniforms();
           entity.ForEachComp<MeshComponent>(
               [&](MeshComponent& mesh_component) { mesh_component.Draw(); });
-
-          static int k = 0;
-          ++k;
         });
         OpenGl::BindVertexArray(0);
 

@@ -31,6 +31,7 @@ include_glm_begin;
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_access.hpp"
 #include "glm/gtc/type_ptr.hpp"
+#include "glm/gtx/euler_angles.hpp"
 #include "glm/gtx/rotate_vector.hpp"
 #include "glm/vec2.hpp"
 #include "glm/vec3.hpp"

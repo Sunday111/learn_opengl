@@ -3,10 +3,11 @@
 #include "components/component.hpp"
 #include "wrap/wrap_glm.hpp"
 
-class PointLightComponent : public SimpleComponentBase<PointLightComponent> {
+class DirectionalLightComponent
+    : public SimpleComponentBase<DirectionalLightComponent> {
  public:
-  PointLightComponent();
-  ~PointLightComponent();
+  DirectionalLightComponent();
+  ~DirectionalLightComponent();
 
   glm::vec3 ambient = glm::vec3(0.1f, 0.1f, 0.1f);
   glm::vec3 diffuse = glm::vec3(1.0f, 1.0f, 1.0f);
@@ -15,7 +16,7 @@ class PointLightComponent : public SimpleComponentBase<PointLightComponent> {
 
 namespace reflection {
 template <>
-struct TypeReflector<PointLightComponent> {
+struct TypeReflector<DirectionalLightComponent> {
   static void ReflectType(TypeHandle handle);
 };
 }  // namespace reflection

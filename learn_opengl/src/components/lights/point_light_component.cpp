@@ -1,4 +1,4 @@
-#include "components/point_light_component.hpp"
+#include "components/lights/point_light_component.hpp"
 
 #include "reflection/glm_reflect.hpp"
 
@@ -12,6 +12,7 @@ void TypeReflector<PointLightComponent>::ReflectType(TypeHandle handle) {
   handle.Add<&PointLightComponent::ambient>("ambient");
   handle.Add<&PointLightComponent::diffuse>("diffuse");
   handle.Add<&PointLightComponent::specular>("specular");
+  handle.Add<&PointLightComponent::attenuation>("attenuation");
   handle.SetBaseClass<Component>();
 }
 }  // namespace reflection
