@@ -120,15 +120,25 @@ struct PointLightUniform {
   UniformHandle quadratic;
 };
 
-auto GetPointLightUniform(Shader& s) {
+static auto GetArrayUniform(const Shader& s, std::string_view array_name,
+                            size_t index, std::string_view property_name) {
+  return s.GetUniform(
+      fmt::format("{}[{}].{}", array_name, index, property_name));
+}
+
+auto GetPointLightUniform(Shader& s, size_t index) {
+  auto get = [&](std::string_view name) {
+    return GetArrayUniform(s, "pointLights", index, name);
+  };
+
   PointLightUniform u;
-  u.location = s.GetUniform("pointLight.location");
-  u.ambient = s.GetUniform("pointLight.ambient");
-  u.diffuse = s.GetUniform("pointLight.diffuse");
-  u.specular = s.GetUniform("pointLight.specular");
-  u.constant = s.GetUniform("pointLight.attenuation.constant");
-  u.linear = s.GetUniform("pointLight.attenuation.linear");
-  u.quadratic = s.GetUniform("pointLight.attenuation.quadratic");
+  u.location = get("location");
+  u.ambient = get("ambient");
+  u.diffuse = get("diffuse");
+  u.specular = get("specular");
+  u.constant = get("attenuation.constant");
+  u.linear = get("attenuation.linear");
+  u.quadratic = get("attenuation.quadratic");
   return u;
 }
 
@@ -139,12 +149,16 @@ struct DirectionalLightUniform {
   UniformHandle specular;
 };
 
-auto GetDirectionalLightUniform(Shader& s) {
+auto GetDirectionalLightUniform(Shader& s, size_t index) {
+  auto get = [&](std::string_view name) {
+    return GetArrayUniform(s, "directionalLights", index, name);
+  };
+
   DirectionalLightUniform u;
-  u.direction = s.GetUniform("directionalLight.direction");
-  u.ambient = s.GetUniform("directionalLight.ambient");
-  u.diffuse = s.GetUniform("directionalLight.diffuse");
-  u.specular = s.GetUniform("directionalLight.specular");
+  u.direction = get("direction");
+  u.ambient = get("ambient");
+  u.diffuse = get("diffuse");
+  u.specular = get("specular");
   return u;
 }
 
@@ -160,17 +174,21 @@ struct SpotLightUniform {
   UniformHandle quadratic;
 };
 
-auto GetSpotLightUniform(Shader& s) {
+auto GetSpotLightUniform(Shader& s, size_t index) {
+  auto get = [&](std::string_view name) {
+    return GetArrayUniform(s, "spotLights", index, name);
+  };
+
   SpotLightUniform u;
-  u.location = s.GetUniform("spotLight.location");
-  u.direction = s.GetUniform("spotLight.direction");
-  u.diffuse = s.GetUniform("spotLight.diffuse");
-  u.specular = s.GetUniform("spotLight.specular");
-  u.innerAngle = s.GetUniform("spotLight.innerAngle");
-  u.outerAngle = s.GetUniform("spotLight.outerAngle");
-  u.constant = s.GetUniform("spotLight.attenuation.constant");
-  u.linear = s.GetUniform("spotLight.attenuation.linear");
-  u.quadratic = s.GetUniform("spotLight.attenuation.quadratic");
+  u.location = get("location");
+  u.direction = get("direction");
+  u.diffuse = get("diffuse");
+  u.specular = get("specular");
+  u.innerAngle = get("innerAngle");
+  u.outerAngle = get("outerAngle");
+  u.constant = get("attenuation.constant");
+  u.linear = get("attenuation.linear");
+  u.quadratic = get("attenuation.quadratic");
   return u;
 }
 
@@ -298,9 +316,9 @@ int main([[maybe_unused]] int argc, char** argv) {
         texture_manager.GetTexture("container_specular.texture.json");
 
     auto material_uniform = GetMaterialUniform(*shader);
-    auto point_light_uniform = GetPointLightUniform(*shader);
-    auto directional_light_uniform = GetDirectionalLightUniform(*shader);
-    auto spot_light_uniform = GetSpotLightUniform(*shader);
+    auto point_light_uniform = GetPointLightUniform(*shader, 0);
+    auto directional_light_uniform = GetDirectionalLightUniform(*shader, 0);
+    auto spot_light_uniform = GetSpotLightUniform(*shader, 0);
 
     shader->SetUniform(material_uniform.diffuse, container_diffuse);
     shader->SetUniform(material_uniform.specular, container_specular);
@@ -343,9 +361,8 @@ int main([[maybe_unused]] int argc, char** argv) {
       light.specular = light_color;
 
       auto& transform = directional_light.AddComponent<TransformComponent>();
-      transform.transform = glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f),   // eye
-                                        glm::vec3(0.0f, 0.0f, 5.0f),   // center
-                                        glm::vec3(0.0f, 0.0f, 1.0f));  // up?
+      transform.transform = glm::yawPitchRoll(
+          glm::radians(0.0f), glm::radians(0.0f), glm::radians(0.0f));
     }
 
     // Create entity with spot light component

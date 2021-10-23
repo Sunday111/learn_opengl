@@ -2,6 +2,23 @@
     "vertex": "vertex_shader.vert",
     "fragment": "fragment_shader.frag",
     "glsl_version": "330 core",
+    "definitions": [
+        {
+            "name": "cv_num_point_lights",
+            "type": "int",
+            "default": 1
+        },
+        {
+            "name": "cv_num_directional_lights",
+            "type": "int",
+            "default": 1
+        },
+        {
+            "name": "cv_num_spot_lights",
+            "type": "int",
+            "default": 1
+        }
+    ],
     "definitions_sample": [
         {
             "name": "cv_abmbient",

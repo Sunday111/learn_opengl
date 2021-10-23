@@ -1,10 +1,12 @@
-struct Attenuation {
+struct Attenuation
+{
     float constant;
     float linear;
     float quadratic;
 };
 
-struct PointLight {
+struct PointLight
+{
     vec3 location;
     vec3 ambient;
     vec3 diffuse;
@@ -12,14 +14,16 @@ struct PointLight {
     Attenuation attenuation;
 };
 
-struct DirectionalLight {
+struct DirectionalLight
+{
     vec3 direction;
     vec3 ambient;
     vec3 diffuse;
     vec3 specular;
 };
 
-struct SpotLight {
+struct SpotLight
+{
     vec3 location;
     vec3 direction;
     vec3 diffuse;
@@ -29,16 +33,32 @@ struct SpotLight {
     Attenuation attenuation;
 };
 
-struct Material {
+struct Material
+{
     sampler2D diffuse;
     sampler2D specular;
     float shininess;
 };
 
+struct LightResult
+{
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+};
+
+struct CachedValues
+{
+    vec3 normal;
+    vec3 viewDirection;
+    vec3 materialDiffuse;
+    vec3 materialSpecular;
+};
+
 uniform vec3 viewLocation;
-uniform PointLight pointLight;
-uniform DirectionalLight directionalLight;
-uniform SpotLight spotLight;
+uniform PointLight pointLights[cv_num_point_lights];
+uniform DirectionalLight directionalLights[cv_num_directional_lights];
+uniform SpotLight spotLights[cv_num_spot_lights];
 uniform Material material;
 
 in vec3 fragmentColor;
@@ -48,63 +68,120 @@ in vec3 fragmentLocation;
 
 out vec4 FragColor;
 
-float ComputeAttenuation(Attenuation attenuation, float dist) {
+float ComputeAttenuation(Attenuation attenuation, float dist)
+{
     float div = attenuation.constant;
     div += attenuation.linear * dist;
     div += attenuation.quadratic * dist * dist;
-    return 1.0f / div;
+    return clamp(1.0f / div, 0, 1.0f);
 }
 
-void main() {
-    vec3 normal = normalize(fragmentNormal);
-    vec3 viewDirection = normalize(viewLocation - fragmentLocation);
+LightResult ApplyPointLight(in PointLight light, in CachedValues cache)
+{
+    LightResult result;
+    float lightDistance = length(light.location - fragmentLocation);
+    float attenuation = ComputeAttenuation(light.attenuation, lightDistance);
+    vec3 lightDirection = normalize(light.location - fragmentLocation);
+    vec3 reflectDirection = reflect(-lightDirection, cache.normal);
+    result.ambient = light.ambient * attenuation;
+    result.diffuse = light.diffuse * attenuation *
+                    max(dot(cache.normal, lightDirection), 0.0f);
+    result.specular = light.specular * attenuation *
+                    pow(max(dot(cache.viewDirection, reflectDirection), 0.0f), material.shininess);
+    return result;
+}
 
-    vec3 ambient = vec3(0);
-    vec3 diffuse = vec3(0);
-    vec3 specular = vec3(0);
+LightResult ApplyDirectionalLight(in DirectionalLight light, in CachedValues cache)
+{
+    LightResult result;
+    vec3 lightDirection = normalize(-light.direction);
+    vec3 reflectDirection = reflect(-lightDirection, cache.normal);
+    result.ambient = light.ambient;
+    result.diffuse = light.diffuse * 
+                max(dot(cache.normal, lightDirection), 0.0f);
+    result.specular = light.specular *
+                pow(max(dot(cache.viewDirection, reflectDirection), 0.0f), material.shininess);
+    return result;
+}
 
-    vec3 materialDiffuse = vec3(texture(material.diffuse, fragmentTextureCoordinates));
-    vec3 materialSpecular = vec3(texture(material.specular, fragmentTextureCoordinates));
+LightResult ApplySpotLight(in SpotLight light, in CachedValues cache)
+{
+    LightResult result;
+    vec3 lightDirection = normalize(light.location - fragmentLocation);
+    vec3 reflectDirection = reflect(-lightDirection, cache.normal);
+    float lightDistance = length(light.location - fragmentLocation);
+    float attenuation = ComputeAttenuation(light.attenuation, lightDistance);
+    float theta = dot(lightDirection, normalize(-light.direction));
+    float epsilon = (light.innerAngle - light.outerAngle);
+    float intensity = clamp((theta - light.outerAngle) / epsilon, 0.0, 1.0);
+    result.diffuse = attenuation * intensity * light.diffuse *
+                    max(dot(cache.normal, lightDirection), 0.0f);
+    result.specular = attenuation * intensity * light.specular *
+                    pow(max(dot(cache.viewDirection, reflectDirection), 0.0f), material.shininess);
+    return result;
+}
 
-    // point light
-    {
-        float lightDistance = length(pointLight.location - fragmentLocation);
-        float attenuation = ComputeAttenuation(pointLight.attenuation, lightDistance);
-        vec3 lightDirection = normalize(pointLight.location - fragmentLocation);
-        vec3 reflectDirection = reflect(-lightDirection, normal);
-        ambient += pointLight.ambient * materialDiffuse * attenuation;
-        diffuse += pointLight.diffuse * materialDiffuse * attenuation *
-                        max(dot(normal, lightDirection), 0.0f);
-        specular += pointLight.specular * materialSpecular * attenuation *
-                        pow(max(dot(viewDirection, reflectDirection), 0.0f), material.shininess);
+void AppendLightResult(inout LightResult a, in LightResult b)
+{
+    a.ambient += b.ambient;
+    a.diffuse += b.diffuse;
+    a.specular += b.specular;
+}
+
+LightResult ComputePointLights(in CachedValues cache)
+{
+    LightResult r;
+    for(int i = 0; i < cv_num_point_lights; ++i) {
+        AppendLightResult(r, ApplyPointLight(pointLights[i], cache));
     }
 
-    // directional light
-    {
-        vec3 lightDirection = normalize(-directionalLight.direction);
-        vec3 reflectDirection = reflect(-lightDirection, normal);
-        ambient += directionalLight.ambient * materialDiffuse;
-        diffuse += directionalLight.diffuse * materialDiffuse * 
-                    max(dot(normal, lightDirection), 0.0f);
-        specular += directionalLight.specular * materialSpecular *
-                    pow(max(dot(viewDirection, reflectDirection), 0.0f), material.shininess);
+    r.ambient *= cache.materialDiffuse;
+    r.diffuse *= cache.materialDiffuse;
+    r.specular *= cache.materialSpecular;
+
+    return r;
+}
+
+LightResult ComputeDirectionalLights(in CachedValues cache)
+{
+    LightResult r;
+    for(int i = 0; i < cv_num_directional_lights; ++i) {
+        AppendLightResult(r, ApplyDirectionalLight(directionalLights[i], cache));
     }
 
-    // spotlight
-    {
-        vec3 lightDirection = normalize(spotLight.location - fragmentLocation);
-        vec3 reflectDirection = reflect(-lightDirection, normal);
-        float lightDistance = length(pointLight.location - fragmentLocation);
-        float attenuation = clamp(ComputeAttenuation(spotLight.attenuation, lightDistance), 0.0f, 1.0f);
-        float theta = dot(lightDirection, normalize(-spotLight.direction));
-        float epsilon = (spotLight.innerAngle - spotLight.outerAngle);
-        float intensity = clamp((theta - spotLight.outerAngle) / epsilon, 0.0, 1.0);
-        diffuse += attenuation * intensity * spotLight.diffuse * materialDiffuse *
-                        max(dot(normal, lightDirection), 0.0f);
-        specular += attenuation * intensity * spotLight.specular * materialSpecular *
-                        pow(max(dot(viewDirection, reflectDirection), 0.0f), material.shininess);
+    r.ambient *= cache.materialDiffuse;
+    r.diffuse *= cache.materialDiffuse;
+    r.specular *= cache.materialSpecular;
+    
+    return r;
+}
+
+LightResult ComputeSpotLights(in CachedValues cache)
+{
+    LightResult r;
+    for(int i = 0; i < cv_num_spot_lights; ++i) {
+        AppendLightResult(r, ApplySpotLight(spotLights[i], cache));
     }
 
-    vec3 resultColor = (ambient + diffuse + specular) * fragmentColor;
+    r.diffuse *= cache.materialDiffuse;
+    r.specular *= cache.materialSpecular;
+    
+    return r;
+}
+
+void main()
+{
+    CachedValues cache;
+    cache.normal = normalize(fragmentNormal);
+    cache.viewDirection = normalize(viewLocation - fragmentLocation);
+    cache.materialDiffuse = vec3(texture(material.diffuse, fragmentTextureCoordinates));
+    cache.materialSpecular = vec3(texture(material.specular, fragmentTextureCoordinates));
+
+    LightResult lightsResult;
+    AppendLightResult(lightsResult, ComputePointLights(cache));
+    AppendLightResult(lightsResult, ComputeDirectionalLights(cache));
+    AppendLightResult(lightsResult, ComputeSpotLights(cache));
+
+    vec3 resultColor = (lightsResult.ambient + lightsResult.diffuse + lightsResult.specular) * fragmentColor;
     FragColor = vec4(resultColor, 1.0f);
 }

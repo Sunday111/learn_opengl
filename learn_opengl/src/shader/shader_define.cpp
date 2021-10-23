@@ -23,7 +23,9 @@ inline static const T& CastBuffer(const std::vector<ui8>& buffer) noexcept {
 
 std::string ShaderDefine::GenDefine() const {
   std::string value_str;
-  if (type_id == reflection::GetTypeId<float>()) {
+  if (type_id == reflection::GetTypeId<int>()) {
+    value_str = fmt::format("{}", CastBuffer<int>(value));
+  } else if (type_id == reflection::GetTypeId<float>()) {
     value_str = fmt::format("{}", CastBuffer<float>(value));
   } else if (type_id == reflection::GetTypeId<glm::vec3>()) {
     const auto& vec = CastBuffer<glm::vec3>(value);
@@ -63,6 +65,10 @@ ShaderDefine ShaderDefine::ReadFromJson(const nlohmann::json& json) {
   if (type_name == "float") {
     def.type_id = reflection::GetTypeId<float>();
     const float v = default_value_json;
+    def.SetValue(MakeValueSpan(v));
+  } else if (type_name == "int") {
+    def.type_id = reflection::GetTypeId<int>();
+    int v = default_value_json;
     def.SetValue(MakeValueSpan(v));
   } else if (type_name == "vec3") {
     def.type_id = reflection::GetTypeId<glm::vec3>();
