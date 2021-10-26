@@ -10,6 +10,7 @@
 #include "gl_api.hpp"
 #include "integer.hpp"
 #include "reflection/reflection.hpp"
+#include "shader/define_handle.hpp"
 #include "shader/uniform_handle.hpp"
 
 class ShaderDefine;
@@ -46,20 +47,25 @@ class Shader {
 
   void SendUniforms();
 
+  template <typename T>
+  const T& GetDefineValue(DefineHandle& handle) const;
+  std::span<const ui8> GetDefineValue(DefineHandle& handle, ui32 type_id) const;
+  std::optional<DefineHandle> FindDefine(Name name) const noexcept;
+  DefineHandle GetDefine(Name name) const;
+
  protected:
   ShaderUniform& GetUniform(UniformHandle& handle);
   const ShaderUniform& GetUniform(UniformHandle& handle) const;
-  std::span<ui8> GetUniformValueViewRaw(UniformHandle& handle, ui32 type_id);
   std::span<const ui8> GetUniformValueViewRaw(UniformHandle& handle,
                                               ui32 type_id) const;
   void UpdateUniformHandle(UniformHandle& handle) const;
 
   template <typename T>
-  T& GetUniformValue(UniformHandle& handle) {
-    std::span<ui8> view =
+  const T& GetUniformValue(UniformHandle& handle) {
+    std::span<const ui8> view =
         GetUniformValueViewRaw(handle, reflection::GetTypeId<T>());
     assert(view.size() == sizeof(T));
-    return *reinterpret_cast<T*>(view.data());
+    return *reinterpret_cast<const T*>(view.data());
   }
 
  private:
@@ -78,3 +84,10 @@ class Shader {
   bool definitions_initialized_ : 1;
   bool need_recompile_ : 1;
 };
+
+template <typename T>
+const T& Shader::GetDefineValue(DefineHandle& handle) const {
+  const ui32 type_id = reflection::GetTypeId<T>();
+  auto value_view = GetDefineValue(handle, type_id);
+  return *reinterpret_cast<const T*>(value_view.data());
+}

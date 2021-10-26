@@ -26,7 +26,7 @@ class ShaderUniform {
   [[nodiscard]] ui32 GetType() const noexcept { return type_id_; }
   [[nodiscard]] ui32 GetLocation() const noexcept { return location_; }
 
-  [[nodiscard]] std::span<ui8> GetValue() noexcept { return value_; }
+  //[[nodiscard]] std::span<ui8> GetValue() noexcept { return value_; }
   [[nodiscard]] std::span<const ui8> GetValue() const noexcept {
     return value_;
   }
@@ -43,4 +43,5 @@ class ShaderUniform {
   Name name_;
   ui32 location_;
   ui32 type_id_;
+  mutable bool sent_ = false;
 };

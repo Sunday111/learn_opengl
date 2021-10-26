@@ -2,7 +2,7 @@
 
 #include "name_cache/name.hpp"
 
-class UniformHandle {
+class DefineHandle {
  public:
   ui32 index = 0;
   Name name;

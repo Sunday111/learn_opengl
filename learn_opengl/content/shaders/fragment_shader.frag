@@ -114,6 +114,7 @@ LightResult ApplySpotLight(in SpotLight light, in CachedValues cache)
     float theta = dot(lightDirection, normalize(-light.direction));
     float epsilon = (light.innerAngle - light.outerAngle);
     float intensity = clamp((theta - light.outerAngle) / epsilon, 0.0, 1.0);
+    result.ambient = vec3(0);
     result.diffuse = attenuation * intensity * light.diffuse *
                     max(dot(cache.normal, lightDirection), 0.0f);
     result.specular = attenuation * intensity * light.specular *

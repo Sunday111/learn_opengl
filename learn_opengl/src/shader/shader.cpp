@@ -210,11 +210,29 @@ void Shader::DrawDetails() {
     ImGui::TreePop();
   }
 
+  constexpr size_t stack_val_bytes = 64;
+  ui64 stack_val_arr[stack_val_bytes / 8];
+
   if (ImGui::TreeNode("Dynamic Variables")) {
     for (ShaderUniform& uniform : uniforms_) {
+      auto type_info = reflection::GetTypeInfo(uniform.GetType());
+
+      type_info->copy_constructor((void*)stack_val_arr,
+                                  uniform.GetValue().data());
+      assert(stack_val_bytes >= type_info->size);
+
+      std::span<ui8> val_view(reinterpret_cast<ui8*>(stack_val_arr),
+                              type_info->size);
+
       bool value_changed = false;
       SimpleTypeWidget(uniform.GetType(), uniform.GetName().GetView(),
-                       uniform.GetValue().data(), value_changed);
+                       val_view.data(), value_changed);
+
+      if (value_changed) {
+        uniform.SetValue(val_view);
+      }
+
+      type_info->destructor(val_view.data());
     }
     ImGui::TreePop();
   }
@@ -222,6 +240,49 @@ void Shader::DrawDetails() {
   if (need_recompile_) {
     Compile();
   }
+}
+
+std::span<const ui8> Shader::GetDefineValue(DefineHandle& handle,
+                                            ui32 type_id) const {
+  [[unlikely]] if (handle.index >= defines_.size() ||
+                   defines_[handle.index].name != handle.name) {
+    handle = GetDefine(handle.name);
+  }
+
+  auto& define = defines_[handle.index];
+  [[unlikely]] if (define.type_id != type_id) {
+    throw std::runtime_error(fmt::format(
+        "Trying to interpret define {} of type {} as {}", define.name.GetView(),
+        reflection::GetTypeInfo(define.type_id)->name,
+        reflection::GetTypeInfo(type_id)->name));
+  }
+
+  return define.value;
+}
+
+std::optional<DefineHandle> Shader::FindDefine(Name name) const noexcept {
+  std::optional<DefineHandle> result;
+  for (size_t index = 0; index < defines_.size(); ++index) {
+    const ShaderDefine& define = defines_[index];
+    if (define.name == name) {
+      DefineHandle h;
+      h.name = name;
+      h.index = static_cast<ui32>(index);
+      result = h;
+      break;
+    }
+  }
+
+  return result;
+}
+
+DefineHandle Shader::GetDefine(Name name) const {
+  [[likely]] if (auto maybe_handle = FindDefine(name); maybe_handle) {
+    return *maybe_handle;
+  }
+
+  throw std::runtime_error(
+      fmt::format("Define is not found: \"{}\"", name.GetView()));
 }
 
 std::optional<UniformHandle> Shader::FindUniform(Name name) const noexcept {
@@ -259,12 +320,12 @@ const ShaderUniform& Shader::GetUniform(UniformHandle& handle) const {
   return uniforms_[handle.index];
 }
 
-std::span<ui8> Shader::GetUniformValueViewRaw(UniformHandle& handle,
-                                              ui32 type_id) {
-  auto& uniform = GetUniform(handle);
-  uniform.EnsureTypeMatch(type_id);
-  return uniform.GetValue();
-}
+// std::span<ui8> Shader::GetUniformValueViewRaw(UniformHandle& handle,
+//                                              ui32 type_id) {
+//  auto& uniform = GetUniform(handle);
+//  uniform.EnsureTypeMatch(type_id);
+//  return uniform.GetValue();
+//}
 
 std::span<const ui8> Shader::GetUniformValueViewRaw(UniformHandle& handle,
                                                     ui32 type_id) const {
@@ -285,13 +346,16 @@ void Shader::SetUniform(UniformHandle& handle, ui32 type_id,
   auto& uniform = GetUniform(handle);
   uniform.EnsureTypeMatch(type_id);
   reflection::TypeHandle type_handle{uniform.GetType()};
-  type_handle->copy_assign(uniform.GetValue().data(), value.data());
+  uniform.SetValue(value);
 }
 
 void Shader::SetUniform(UniformHandle& handle,
                         const std::shared_ptr<Texture>& texture) {
-  auto& sampler_uniform = GetUniformValue<SamplerUniform>(handle);
+  auto sampler_uniform = GetUniformValue<SamplerUniform>(handle);
+  ShaderUniform& u = uniforms_[handle.index];
   sampler_uniform.texture = texture;
+  u.SetValue(std::span(reinterpret_cast<const ui8*>(&sampler_uniform),
+                       sizeof(sampler_uniform)));
 }
 
 void Shader::SendUniforms() {
@@ -305,7 +369,6 @@ void Shader::Check() const {
 }
 
 void Shader::Destroy() {
-  uniforms_.clear();
   if (program_) {
     glDeleteProgram(*program_);
     program_.reset();
@@ -416,11 +479,13 @@ void Shader::UpdateUniforms() {
   std::swap(uniforms, uniforms_);
 
   for (size_t i = 0; i < uniforms_.size(); ++i) {
-    const ShaderUniform& uniform = uniforms_[i];
+    ShaderUniform& uniform = uniforms_[i];
     if (uniform.GetType() == reflection::GetTypeId<SamplerUniform>()) {
       UniformHandle handle{static_cast<ui32>(i), uniform.GetName()};
-      auto& sampler = GetUniformValue<SamplerUniform>(handle);
+      auto sampler = GetUniformValue<SamplerUniform>(handle);
       sampler.sampler_index = static_cast<ui8>(i);
+      uniform.SetValue(
+          std::span(reinterpret_cast<const ui8*>(&sampler), sizeof(sampler)));
     }
   }
 }

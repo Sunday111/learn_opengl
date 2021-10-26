@@ -57,10 +57,17 @@ void ShaderUniform::MoveFrom(ShaderUniform& another) {
   value_ = std::move(another.value_);
   location_ = another.location_;
   type_id_ = another.type_id_;
+  sent_ = another.sent_;
 }
 
 void ShaderUniform::SendValue() const {
   CheckNotEmpty();
+
+  if (sent_) {
+    return;
+  }
+
+  sent_ = true;
 
   const bool type_found =
       SendActualValue<float>(type_id_, location_, value_) ||
@@ -98,6 +105,7 @@ bool ShaderUniform::IsEmpty() const noexcept { return value_.empty(); }
 
 void ShaderUniform::SetValue(std::span<const ui8> value) {
   CheckNotEmpty();
+  sent_ = false;
   reflection::TypeHandle type_handle{type_id_};
   assert(type_handle->size == value.size());
   type_handle->copy_assign(value_.data(), value.data());
@@ -113,6 +121,7 @@ void ShaderUniform::Clear() {
     reflection::TypeHandle type_handle{type_id_};
     type_handle->destructor(value_.data());
     value_.clear();
+    sent_ = false;
   }
 }
 

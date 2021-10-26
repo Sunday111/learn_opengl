@@ -6,17 +6,17 @@
         {
             "name": "cv_num_point_lights",
             "type": "int",
-            "default": 1
+            "default": 5
         },
         {
             "name": "cv_num_directional_lights",
             "type": "int",
-            "default": 1
+            "default": 5
         },
         {
             "name": "cv_num_spot_lights",
             "type": "int",
-            "default": 1
+            "default": 5
         }
     ],
     "definitions_sample": [
