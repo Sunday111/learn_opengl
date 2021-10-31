@@ -1,4 +1,4 @@
-#include "debug/gl_debug_messenger.hpp"
+#include "opengl/debug/gl_debug_messenger.hpp"
 
 #include "macro/to_string.hpp"
 #include "spdlog/spdlog.h"

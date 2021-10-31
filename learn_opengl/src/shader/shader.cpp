@@ -105,6 +105,12 @@ static GLuint LinkShaders(const std::span<const GLuint>& shaders) {
 
 static auto get_shader_json(const std::filesystem::path& path) {
   std::ifstream shader_file(path);
+
+  [[unlikely]] if (!shader_file.is_open()) {
+    throw std::invalid_argument(
+        fmt::format("Failed to open file {}", path.string()));
+  }
+
   nlohmann::json shader_json;
   shader_file >> shader_json;
   return shader_json;
@@ -173,7 +179,8 @@ void Shader::Compile() {
       return;
     }
 
-    auto stage_path = shaders_dir_ / std::string(shader_json[json_name]);
+    auto stage_path =
+        shaders_dir_ / "src" / std::string(shader_json[json_name]);
     const GLuint shader = glCreateShader(type);
 
     try {
@@ -244,10 +251,7 @@ void Shader::DrawDetails() {
 
 std::span<const ui8> Shader::GetDefineValue(DefineHandle& handle,
                                             ui32 type_id) const {
-  [[unlikely]] if (handle.index >= defines_.size() ||
-                   defines_[handle.index].name != handle.name) {
-    handle = GetDefine(handle.name);
-  }
+  UpdateDefineHandle(handle);
 
   auto& define = defines_[handle.index];
   [[unlikely]] if (define.type_id != type_id) {
@@ -258,6 +262,17 @@ std::span<const ui8> Shader::GetDefineValue(DefineHandle& handle,
   }
 
   return define.value;
+}
+
+void Shader::SetDefineValue(DefineHandle& handle, ui32 type_id,
+                            std::span<const ui8> value) {
+  UpdateDefineHandle(handle);
+  ShaderDefine& define = defines_[handle.index];
+  define.SetValue(value);
+  need_recompile_ = true;
+
+  [[unlikely]] if (define.type_id !=
+                   type_id) throw std::runtime_error(fmt::format("wrong type"));
 }
 
 std::optional<DefineHandle> Shader::FindDefine(Name name) const noexcept {
@@ -320,13 +335,6 @@ const ShaderUniform& Shader::GetUniform(UniformHandle& handle) const {
   return uniforms_[handle.index];
 }
 
-// std::span<ui8> Shader::GetUniformValueViewRaw(UniformHandle& handle,
-//                                              ui32 type_id) {
-//  auto& uniform = GetUniform(handle);
-//  uniform.EnsureTypeMatch(type_id);
-//  return uniform.GetValue();
-//}
-
 std::span<const ui8> Shader::GetUniformValueViewRaw(UniformHandle& handle,
                                                     ui32 type_id) const {
   auto& uniform = GetUniform(handle);
@@ -338,6 +346,13 @@ void Shader::UpdateUniformHandle(UniformHandle& handle) const {
   if (handle.index >= uniforms_.size() ||
       uniforms_[handle.index].GetName() != handle.name) {
     handle = GetUniform(handle.name);
+  }
+}
+
+void Shader::UpdateDefineHandle(DefineHandle& handle) const {
+  [[unlikely]] if (handle.index >= defines_.size() ||
+                   defines_[handle.index].name != handle.name) {
+    handle = GetDefine(handle.name);
   }
 }
 

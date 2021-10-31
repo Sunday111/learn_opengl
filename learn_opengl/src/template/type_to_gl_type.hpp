@@ -1,6 +1,6 @@
 #pragma once
 
-#include "gl_api.hpp"
+#include "opengl/gl_api.hpp"
 
 template <typename T>
 struct TypeToGlType;

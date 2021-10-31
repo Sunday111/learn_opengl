@@ -187,7 +187,6 @@ void MeshComponent::MakeCube(float width, const glm::vec3& color,
 }
 
 void MeshComponent::Draw() {
-  shader_->Use();
   OpenGl::BindVertexArray(vao_);
   OpenGl::DrawElements(GL_TRIANGLES, num_indices_, GL_UNSIGNED_INT, nullptr);
 }

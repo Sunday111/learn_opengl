@@ -1,6 +1,6 @@
 {
-    "vertex": "vertex_shader.vert",
-    "fragment": "fragment_shader.frag",
+    "vertex": "simple.vert",
+    "fragment": "simple.frag",
     "glsl_version": "330 core",
     "definitions": [
         {

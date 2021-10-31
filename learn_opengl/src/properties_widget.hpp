@@ -7,7 +7,7 @@
 #include <type_traits>
 #include <vector>
 
-#include "gl_api.hpp"
+#include "opengl/gl_api.hpp"
 #include "wrap/wrap_imgui.h"
 
 template <typename T>

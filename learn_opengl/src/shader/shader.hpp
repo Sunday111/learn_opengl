@@ -7,8 +7,8 @@
 #include <string_view>
 #include <vector>
 
-#include "gl_api.hpp"
 #include "integer.hpp"
+#include "opengl/gl_api.hpp"
 #include "reflection/reflection.hpp"
 #include "shader/define_handle.hpp"
 #include "shader/uniform_handle.hpp"
@@ -53,12 +53,23 @@ class Shader {
   std::optional<DefineHandle> FindDefine(Name name) const noexcept;
   DefineHandle GetDefine(Name name) const;
 
+  void SetDefineValue(DefineHandle& handle, ui32 type,
+                      std::span<const ui8> value);
+
+  template <typename T>
+  void SetDefineValue(DefineHandle& handle, const T& value) {
+    SetDefineValue(
+        handle, reflection::GetTypeId<T>(),
+        std::span<const ui8>(reinterpret_cast<const ui8*>(&value), sizeof(T)));
+  }
+
  protected:
   ShaderUniform& GetUniform(UniformHandle& handle);
   const ShaderUniform& GetUniform(UniformHandle& handle) const;
   std::span<const ui8> GetUniformValueViewRaw(UniformHandle& handle,
                                               ui32 type_id) const;
   void UpdateUniformHandle(UniformHandle& handle) const;
+  void UpdateDefineHandle(DefineHandle& handle) const;
 
   template <typename T>
   const T& GetUniformValue(UniformHandle& handle) {

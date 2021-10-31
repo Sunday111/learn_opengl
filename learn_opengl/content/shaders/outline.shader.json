@@ -1,0 +1,6 @@
+{
+    "vertex": "outline.vert",
+    "fragment": "outline.frag",
+    "glsl_version": "330 core",
+    "definitions": []
+}

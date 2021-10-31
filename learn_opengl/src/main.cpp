@@ -13,11 +13,12 @@
 #include "components/lights/spot_light_component.hpp"
 #include "components/mesh_component.hpp"
 #include "components/transform_component.hpp"
-#include "debug/gl_debug_messenger.hpp"
 #include "entities/entity.hpp"
 #include "image_loader.hpp"
 #include "integer.hpp"
 #include "name_cache/name_cache.hpp"
+#include "opengl/debug/annotations.hpp"
+#include "opengl/debug/gl_debug_messenger.hpp"
 #include "properties_widget.hpp"
 #include "read_file.hpp"
 #include "reflection/glm_reflect.hpp"
@@ -263,19 +264,6 @@ void CreateMeshes(World& world, const std::shared_ptr<Shader>& shader) {
   }
 }
 
-template <typename Element, typename Default>
-void BatchHelper(size_t num_elements, size_t batch_size, size_t first,
-                 Element&& handle_element, Default&& handle_default) {
-  for (size_t batch_index = 0; batch_index < batch_size; ++batch_index) {
-    const size_t index = first + batch_index;
-    if (index < num_elements) {
-      handle_element(index, batch_index);
-    } else {
-      handle_default(batch_index);
-    }
-  }
-}
-
 void PrintUniform(const PointLightUniform& u) {
   spdlog::info(u.location.name.GetView());
   spdlog::info(u.ambient.name.GetView());
@@ -312,43 +300,240 @@ void PrintUniforms(std::span<T, Extent> uniforms) {
   }
 }
 
-template <typename T, typename F>
-void RefreshUniformsArray(std::vector<T>& uniforms, Shader& shader,
-                          size_t batch_size, F update_fn) {
-  [[unlikely]] if (batch_size != uniforms.size()) {
-    uniforms.resize(batch_size);
-    for (size_t idx = 0; idx < batch_size; ++idx) {
-      uniforms[idx] = update_fn(shader, idx);
+template <typename UniformType, typename LightComponent, typename UniformGetter>
+void SetLightsArrayUniform(
+    Shader& shader, DefineHandle& define, std::vector<UniformType>& uniforms,
+    std::vector<std::pair<TransformComponent*, LightComponent*>>& lights,
+    const std::pair<TransformComponent*, LightComponent*>& default_light,
+    UniformGetter uniform_getter) {
+  auto num_uniforms = static_cast<size_t>(shader.GetDefineValue<int>(define));
+
+  [[unlikely]] if (lights.size() > num_uniforms) {
+    int new_define = static_cast<int>(lights.size());
+    shader.SetDefineValue(define, new_define);
+    num_uniforms = static_cast<size_t>(new_define);
+    shader.Compile();
+    shader.Use();
+  }
+
+  // Refresh uniforms array if number changed
+  [[unlikely]] if (num_uniforms != uniforms.size()) {
+    uniforms.resize(num_uniforms);
+    for (size_t idx = 0; idx < num_uniforms; ++idx) {
+      uniforms[idx] = uniform_getter(shader, idx);
     }
     // PrintUniforms(std::span{uniforms});
   }
+
+  // Apply actual lights
+  size_t uniform_index = 0;
+  while ((uniform_index < lights.size()) && (uniform_index < num_uniforms)) {
+    auto [t, l] = lights[uniform_index];
+    ApplyUniforms(uniforms[uniform_index], shader, *t, *l);
+    ++uniform_index;
+  }
+
+  // Apply defaults if there are unused slots
+  auto [t, l] = default_light;
+  while (uniform_index < num_uniforms) {
+    ApplyUniforms(uniforms[uniform_index], shader, *t, *l);
+    ++uniform_index;
+  }
 }
 
-template <typename UniformType, typename LightComponent, typename F>
-void BatchLight(
-    size_t& next_light, Shader& shader, DefineHandle& def_batch_size,
-    std::vector<UniformType>& uniforms,
-    std::vector<std::pair<TransformComponent*, LightComponent*>>& lights,
-    const std::pair<TransformComponent*, LightComponent*>& default_light,
-    F update_fn) {
-  const auto batch_size =
-      static_cast<size_t>(shader.GetDefineValue<int>(def_batch_size));
-  RefreshUniformsArray(uniforms, shader, batch_size, update_fn);
+class RenderSystem {
+ public:
+  RenderSystem(TextureManager& texture_manager)
+      : texture_manager_(&texture_manager) {
+    shader_ = std::make_shared<Shader>("simple.shader.json");
+    outline_shader_ = std::make_shared<Shader>("outline.shader.json");
+    shader_->Use();
 
-  BatchHelper(
-      lights.size(), batch_size, next_light,
-      [&](size_t index, size_t batch_index) {
-        auto [t, l] = lights[index];
-        auto& u = uniforms[batch_index];
-        ApplyUniforms(u, shader, *t, *l);
-      },
-      [&](size_t batch_index) {
-        auto [t, l] = default_light;
-        auto& u = uniforms[batch_index];
-        ApplyUniforms(u, shader, *t, *l);
+    container_diffuse_ = texture_manager.GetTexture("container.texture.json");
+    container_specular_ =
+        texture_manager.GetTexture("container_specular.texture.json");
+
+    default_point_light_.ambient = glm::vec3(0.0f);
+    default_point_light_.diffuse = glm::vec3(0.0f);
+    default_point_light_.specular = glm::vec3(0.0f);
+    default_directional_light_.ambient = glm::vec3(0.0f);
+    default_directional_light_.diffuse = glm::vec3(0.0f);
+    default_directional_light_.specular = glm::vec3(0.0f);
+    default_spot_light_.diffuse = glm::vec3(0.0f);
+    default_spot_light_.specular = glm::vec3(0.0f);
+    def_num_point_lights_ = shader_->GetDefine("cv_num_point_lights");
+    def_num_directional_lights_ =
+        shader_->GetDefine("cv_num_directional_lights");
+    def_num_spot_lights_ = shader_->GetDefine("cv_num_spot_lights");
+
+    material_uniform_ = GetMaterialUniform(*shader_);
+
+    model_uniform_ = shader_->GetUniform("model");
+    view_uniform_ = shader_->GetUniform("view");
+    projection_uniform_ = shader_->GetUniform("projection");
+    view_location_uniform_ = shader_->GetUniform("viewLocation");
+    tex_multiplier_uniform_ = shader_->GetUniform("texCoordMultiplier");
+
+    outline_model_uniform_ = shader_->GetUniform("model");
+    outline_view_uniform_ = shader_->GetUniform("view");
+    outline_projection_uniform_ = shader_->GetUniform("projection");
+
+    shader_->SetUniform(material_uniform_.diffuse, container_diffuse_);
+    shader_->SetUniform(material_uniform_.specular, container_specular_);
+    shader_->SetUniform(material_uniform_.shininess, 32.0f);
+    shader_->SetUniform(tex_multiplier_uniform_, glm::vec2{1.0f, 1.0f});
+  }
+
+  void ApplyLights() {
+    SetLightsArrayUniform(
+        *shader_, def_num_point_lights_, point_light_uniforms_, point_lights_,
+        {&default_transform_, &default_point_light_}, GetPointLightUniform);
+
+    SetLightsArrayUniform(*shader_, def_num_directional_lights_,
+                          directional_light_uniforms_, directional_lights_,
+                          {&default_transform_, &default_directional_light_},
+                          GetDirectionalLightUniform);
+
+    SetLightsArrayUniform(
+        *shader_, def_num_spot_lights_, spot_light_uniforms_, spot_lights_,
+        {&default_transform_, &default_spot_light_}, GetSpotLightUniform);
+  }
+
+  void Render(Window& window, World& world, Entity* selected) {
+    OpenGl::Viewport(0, 0, static_cast<GLsizei>(window.GetWidth()),
+                     static_cast<GLsizei>(window.GetHeight()));
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    glEnable(GL_DEPTH_TEST);
+
+    glEnable(GL_STENCIL_TEST);
+    glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+    glStencilFunc(GL_ALWAYS, 1, 0xFF);
+    glStencilMask(0xFF);
+
+    OpenGl::Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT |
+                  GL_STENCIL_BUFFER_BIT);
+
+    {
+      ScopeAnnotation annot_render_("Render world");
+      shader_->Use();
+      shader_->SetUniform(view_uniform_, window.GetView());
+      shader_->SetUniform(view_location_uniform_, window.GetCamera()->eye);
+      shader_->SetUniform(projection_uniform_, window.GetProjection());
+
+      ApplyLights();
+      world.ForEachEntity([&](Entity& entity) {
+        const bool is_selected = (&entity == selected);
+        // don't update stencil buffer for not selected objects
+        glStencilMask(is_selected ? 0xFF : 0x00);
+
+        entity.ForEachComp<TransformComponent>(
+            [&](TransformComponent& transform_component) {
+              shader_->SetUniform(model_uniform_,
+                                  transform_component.transform);
+            });
+
+        shader_->SendUniforms();
+        entity.ForEachComp<MeshComponent>(
+            [&](MeshComponent& mesh_component) { mesh_component.Draw(); });
       });
+    }
 
-  next_light += batch_size;
+    if (selected) {
+      ScopeAnnotation annot_render_("Outline");
+      glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+      glStencilMask(0x00);
+      glDisable(GL_DEPTH_TEST);
+      outline_shader_->Use();
+      outline_shader_->SetUniform(outline_view_uniform_, window.GetView());
+      outline_shader_->SetUniform(outline_projection_uniform_,
+                                  window.GetProjection());
+
+      selected->ForEachComp<TransformComponent>(
+          [&](TransformComponent& transform_component) {
+            auto scaled = glm::scale(transform_component.transform,
+                                     glm::vec3(1.1f, 1.1f, 1.1f));
+            outline_shader_->SetUniform(outline_model_uniform_, scaled);
+          });
+
+      outline_shader_->SendUniforms();
+      selected->ForEachComp<MeshComponent>(
+          [&](MeshComponent& mesh_component) { mesh_component.Draw(); });
+    }
+
+    OpenGl::BindVertexArray(0);
+  }
+
+  TextureManager* texture_manager_;
+
+  TransformComponent default_transform_;
+  PointLightComponent default_point_light_;
+  DirectionalLightComponent default_directional_light_;
+  SpotLightComponent default_spot_light_;
+  DefineHandle def_num_point_lights_;
+  DefineHandle def_num_directional_lights_;
+  DefineHandle def_num_spot_lights_;
+
+  MaterialUniform material_uniform_;
+  UniformHandle model_uniform_;
+  UniformHandle view_uniform_;
+  UniformHandle view_location_uniform_;
+  UniformHandle projection_uniform_;
+  UniformHandle tex_multiplier_uniform_;
+
+  UniformHandle outline_model_uniform_;
+  UniformHandle outline_view_uniform_;
+  UniformHandle outline_projection_uniform_;
+
+  std::shared_ptr<Shader> shader_;
+  std::shared_ptr<Shader> outline_shader_;
+  std::vector<PointLightUniform> point_light_uniforms_;
+  std::vector<std::pair<TransformComponent*, PointLightComponent*>>
+      point_lights_;
+  std::vector<DirectionalLightUniform> directional_light_uniforms_;
+  std::vector<std::pair<TransformComponent*, DirectionalLightComponent*>>
+      directional_lights_;
+  std::vector<SpotLightUniform> spot_light_uniforms_;
+  std::vector<std::pair<TransformComponent*, SpotLightComponent*>> spot_lights_;
+
+  std::shared_ptr<Texture> container_diffuse_;
+  std::shared_ptr<Texture> container_specular_;
+};
+
+void CreatePointLights(World& world, RenderSystem& render_system) {
+  size_t num_lights = 14;
+  float radius = 5.0f;
+
+  std::array light_colors{
+      glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, 1.0f, 0.0f),
+      glm::vec3(0.0f, 1.0f, 1.0f), glm::vec3(1.0f, 0.0f, 0.0f),
+      glm::vec3(1.0f, 0.0f, 1.0f), glm::vec3(1.0f, 1.0f, 0.0f),
+      glm::vec3(1.0f, 1.0f, 1.0f)};
+
+  for (size_t light_index = 0; light_index < num_lights; ++light_index) {
+    Entity& entity = world.SpawnEntity<Entity>();
+    entity.SetName(fmt::format("point lights {}", light_index));
+    PointLightComponent& light = entity.AddComponent<PointLightComponent>();
+    const auto light_color = light_colors[light_index % light_colors.size()];
+    light.diffuse = light_color;
+    light.ambient = glm::vec3(0.0f);
+    light.specular = light_color;
+    MeshComponent& mesh = entity.AddComponent<MeshComponent>();
+    mesh.MakeCube(0.2f, light_color, render_system.shader_);
+    TransformComponent& transform = entity.AddComponent<TransformComponent>();
+
+    float angle = (360.0f * light_index) / num_lights;
+    float y = glm::sin(glm::radians(angle));
+    float x = glm::cos(glm::radians(angle));
+
+    const glm::vec3 location =
+        glm::vec3(0.0f, 0.0f, 1.0f) + glm::vec3(x, y, 0.0f) * radius;
+    transform.transform = glm::translate(transform.transform, location);
+
+    render_system.point_lights_.push_back({&transform, &light});
+  }
 }
 
 int main([[maybe_unused]] int argc, char** argv) {
@@ -391,114 +576,47 @@ int main([[maybe_unused]] int argc, char** argv) {
 
     ProgramProperties properties;
     ParametersWidget widget(&properties);
-    auto shader = std::make_shared<Shader>("simple.shader.json");
-    auto container_diffuse =
-        texture_manager.GetTexture("container.texture.json");
-    auto container_specular =
-        texture_manager.GetTexture("container_specular.texture.json");
-
-    auto material_uniform = GetMaterialUniform(*shader);
-
-    shader->SetUniform(material_uniform.diffuse, container_diffuse);
-    shader->SetUniform(material_uniform.specular, container_specular);
-    shader->SetUniform(material_uniform.shininess, 32.0f);
-
-    auto model_uniform = shader->GetUniform("model");
-    auto view_uniform = shader->GetUniform("view");
-    auto view_location_uniform = shader->GetUniform("viewLocation");
-    auto projection_uniform = shader->GetUniform("projection");
-    auto tex_multiplier_uniform = shader->GetUniform("texCoordMultiplier");
-    auto def_num_point_lights = shader->GetDefine("cv_num_point_lights");
-    auto def_num_directional_lights =
-        shader->GetDefine("cv_num_directional_lights");
-    auto def_num_spot_lights = shader->GetDefine("cv_num_spot_lights");
 
     World world;
 
-    std::vector<PointLightUniform> point_light_uniforms;
-    std::vector<std::pair<TransformComponent*, PointLightComponent*>>
-        point_lights;
+    RenderSystem render_system(texture_manager);
 
-    std::vector<DirectionalLightUniform> directional_light_uniforms;
-    std::vector<std::pair<TransformComponent*, DirectionalLightComponent*>>
-        directional_lights;
-
-    std::vector<SpotLightUniform> spot_light_uniforms;
-    std::vector<std::pair<TransformComponent*, SpotLightComponent*>>
-        spot_lights;
-
-    // Create entity with light component
-    {
-      Entity& entity = world.SpawnEntity<Entity>();
-      const glm::vec3 light_color(1.0f, 1.0f, 1.0f);
-      entity.SetName("PointLight");
-      PointLightComponent& light = entity.AddComponent<PointLightComponent>();
-      light.diffuse = light_color;
-      light.ambient = light_color * 0.1f;
-      light.specular = light_color;
-      MeshComponent& mesh = entity.AddComponent<MeshComponent>();
-      mesh.MakeCube(0.2f, light_color, shader);
-      TransformComponent& transform = entity.AddComponent<TransformComponent>();
-      transform.transform =
-          glm::translate(transform.transform, glm::vec3(1.0f, 1.0f, 1.0f));
-
-      point_lights.push_back({&transform, &light});
-    }
-
-    // Create entity with light component
-    {
-      Entity& entity = world.SpawnEntity<Entity>();
-      const glm::vec3 light_color(1.0f, 0.0f, 0.0f);
-      entity.SetName("PointLight2");
-      PointLightComponent& light = entity.AddComponent<PointLightComponent>();
-      light.diffuse = light_color;
-      light.ambient = light_color * 0.1f;
-      light.specular = light_color;
-      MeshComponent& mesh = entity.AddComponent<MeshComponent>();
-      mesh.MakeCube(0.2f, light_color, shader);
-      TransformComponent& transform = entity.AddComponent<TransformComponent>();
-      transform.transform =
-          glm::translate(transform.transform, glm::vec3(-1.0f, -1.0f, 1.0f));
-
-      point_lights.push_back({&transform, &light});
-    }
-
-    // Create entity with directional light component
-    {
-      Entity& entity = world.SpawnEntity<Entity>();
-      const glm::vec3 light_color(1.0f, 1.0f, 1.0f);
-      entity.SetName("DirectionalLight");
-      auto& light = entity.AddComponent<DirectionalLightComponent>();
-      light.diffuse = light_color;
-      light.ambient = light_color * 0.1f;
-      light.specular = light_color;
-
-      auto& transform = entity.AddComponent<TransformComponent>();
-      transform.transform = glm::yawPitchRoll(
-          glm::radians(0.0f), glm::radians(0.0f), glm::radians(0.0f));
-
-      directional_lights.push_back({&transform, &light});
-    }
-
-    // Create entity with spot light component
-    {
-      Entity& entity = world.SpawnEntity<Entity>();
-      const glm::vec3 light_color(1.0f, 1.0f, 1.0f);
-      entity.SetName("SpotLight");
-      auto& light = entity.AddComponent<SpotLightComponent>();
-      light.diffuse = light_color;
-      light.specular = light_color;
-      light.innerAngle = glm::cos(glm::radians(12.5f));
-      light.outerAngle = glm::cos(glm::radians(15.0f));
-
-      auto& transform = entity.AddComponent<TransformComponent>();
-      transform.transform =
-          glm::translate(transform.transform, glm::vec3(0.0f, 0.0, 1.0f));
-      transform.transform *= glm::yawPitchRoll(
-          glm::radians(0.0f), glm::radians(-90.0f), glm::radians(0.0f));
-
-      spot_lights.push_back({&transform, &light});
-    }
+    //// Create entity with directional light component
+    //{
+    //  Entity& entity = world.SpawnEntity<Entity>();
+    //  const glm::vec3 light_color(1.0f, 1.0f, 1.0f);
+    //  entity.SetName("DirectionalLight");
+    //  auto& light = entity.AddComponent<DirectionalLightComponent>();
+    //  light.diffuse = light_color;
+    //  light.ambient = light_color * 0.1f;
+    //  light.specular = light_color;
+    //
+    //  auto& transform = entity.AddComponent<TransformComponent>();
+    //  transform.transform = glm::yawPitchRoll(
+    //      glm::radians(0.0f), glm::radians(0.0f), glm::radians(0.0f));
+    //
+    //  render_system.directional_lights_.push_back({&transform, &light});
+    //}
+    //
+    //// Create entity with spot light component
+    //{
+    //  Entity& entity = world.SpawnEntity<Entity>();
+    //  const glm::vec3 light_color(1.0f, 1.0f, 1.0f);
+    //  entity.SetName("SpotLight");
+    //  auto& light = entity.AddComponent<SpotLightComponent>();
+    //  light.diffuse = light_color;
+    //  light.specular = light_color;
+    //  light.innerAngle = glm::cos(glm::radians(12.5f));
+    //  light.outerAngle = glm::cos(glm::radians(15.0f));
+    //
+    //  auto& transform = entity.AddComponent<TransformComponent>();
+    //  transform.transform =
+    //      glm::translate(transform.transform, glm::vec3(0.0f, 0.0, 1.0f));
+    //  transform.transform *= glm::yawPitchRoll(
+    //      glm::radians(0.0f), glm::radians(-90.0f), glm::radians(0.0f));
+    //
+    //  render_system.spot_lights_.push_back({&transform, &light});
+    //}
 
     // Create entity with camera component and link it with window
     {
@@ -509,32 +627,15 @@ int main([[maybe_unused]] int argc, char** argv) {
       entity.AddComponent<TransformComponent>();
     }
 
-    TransformComponent default_transform;
-    PointLightComponent default_point_light;
-    DirectionalLightComponent default_directional_light;
-    SpotLightComponent default_spot_light;
-
-    {
-      default_point_light.ambient = glm::vec3(0.0f);
-      default_point_light.diffuse = glm::vec3(0.0f);
-      default_point_light.specular = glm::vec3(0.0f);
-      default_directional_light.ambient = glm::vec3(0.0f);
-      default_directional_light.diffuse = glm::vec3(0.0f);
-      default_directional_light.specular = glm::vec3(0.0f);
-      default_spot_light.diffuse = glm::vec3(0.0f);
-      default_spot_light.specular = glm::vec3(0.0f);
-    }
-
-    CreateMeshes(world, shader);
+    CreateMeshes(world, render_system.shader_);
+    CreatePointLights(world, render_system);
 
     UpdateProperties<true>(properties);
-    shader->Use();
-
-    shader->SetUniform(tex_multiplier_uniform, glm::vec2{1.0f, 1.0f});
 
     auto prev_frame_time = std::chrono::high_resolution_clock::now();
 
     while (!windows.empty()) {
+      ScopeAnnotation frame_annotation("Frame");
       const auto current_frame_time = std::chrono::high_resolution_clock::now();
       const auto frame_delta_time =
           std::chrono::duration<float, std::chrono::seconds::period>(
@@ -551,13 +652,7 @@ int main([[maybe_unused]] int argc, char** argv) {
           continue;
         }
         window->ProcessInput(frame_delta_time);
-        window->MakeContextCurrent();
 
-        OpenGl::Viewport(0, 0, static_cast<GLsizei>(window->GetWidth()),
-                         static_cast<GLsizei>(window->GetHeight()));
-        OpenGl::Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
@@ -567,10 +662,11 @@ int main([[maybe_unused]] int argc, char** argv) {
 
         UpdateProperties(properties);
 
-        static int selected_entity = -1;
+        static int selected_entity_id = -1;
+        Entity* selected_entity = nullptr;
         ImGui::Begin("Details");
         ImGui::ListBox(
-            "Entities", &selected_entity,
+            "Entities", &selected_entity_id,
             [](void* data, int idx, const char** name) {
               [[likely]] if (data) {
                 World* world = reinterpret_cast<World*>(data);
@@ -585,56 +681,23 @@ int main([[maybe_unused]] int argc, char** argv) {
               return false;
             },
             &world, static_cast<int>(world.GetNumEntities()));
-        if (selected_entity >= 0) {
-          Entity* entity =
-              world.GetEntityByIndex(static_cast<size_t>(selected_entity));
-          if (entity) {
-            entity->DrawDetails();
+        if (selected_entity_id >= 0) {
+          selected_entity =
+              world.GetEntityByIndex(static_cast<size_t>(selected_entity_id));
+          if (selected_entity) {
+            selected_entity->DrawDetails();
           }
         }
         ImGui::End();
 
-        // Rendering
-        ImGui::Render();
+        render_system.Render(*window, world, selected_entity);
 
-        shader->Use();
+        {
+          ScopeAnnotation imgui_render("ImGUI");
+          ImGui::Render();
+          ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        }
 
-        size_t next_point_light = 0;
-        BatchLight(next_point_light, *shader, def_num_point_lights,
-                   point_light_uniforms, point_lights,
-                   {&default_transform, &default_point_light},
-                   GetPointLightUniform);
-
-        size_t next_directional_light = 0;
-        BatchLight(next_directional_light, *shader, def_num_directional_lights,
-                   directional_light_uniforms, directional_lights,
-                   {&default_transform, &default_directional_light},
-                   GetDirectionalLightUniform);
-
-        size_t next_spot_light = 0;
-        BatchLight(next_spot_light, *shader, def_num_spot_lights,
-                   spot_light_uniforms, spot_lights,
-                   {&default_transform, &default_spot_light},
-                   GetSpotLightUniform);
-
-        shader->SetUniform(view_uniform, window->GetView());
-        shader->SetUniform(view_location_uniform, window->GetCamera()->eye);
-        shader->SetUniform(projection_uniform, window->GetProjection());
-
-        world.ForEachEntity([&](Entity& entity) {
-          entity.ForEachComp<TransformComponent>(
-              [&](TransformComponent& transform_component) {
-                shader->SetUniform(model_uniform,
-                                   transform_component.transform);
-              });
-
-          shader->SendUniforms();
-          entity.ForEachComp<MeshComponent>(
-              [&](MeshComponent& mesh_component) { mesh_component.Draw(); });
-        });
-        OpenGl::BindVertexArray(0);
-
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         window->SwapBuffers();
         ++i;
       }

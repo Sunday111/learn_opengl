@@ -3,10 +3,11 @@
 #include <stdexcept>
 
 #include "fmt/format.h"
-#include "gl_api.hpp"
+#include "opengl/gl_api.hpp"
 #include "reflection/glm_reflect.hpp"
 #include "reflection/predefined.hpp"
 #include "sampler_uniform.hpp"
+#include "spdlog/spdlog.h"
 
 template <typename T>
 struct ValueTypeHelper {

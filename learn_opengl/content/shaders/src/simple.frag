@@ -175,7 +175,8 @@ void main()
     CachedValues cache;
     cache.normal = normalize(fragmentNormal);
     cache.viewDirection = normalize(viewLocation - fragmentLocation);
-    cache.materialDiffuse = vec3(texture(material.diffuse, fragmentTextureCoordinates));
+    vec4 materialDiffuse = texture(material.diffuse, fragmentTextureCoordinates);
+    cache.materialDiffuse = vec3(materialDiffuse);
     cache.materialSpecular = vec3(texture(material.specular, fragmentTextureCoordinates));
 
     LightResult lightsResult;
@@ -184,5 +185,5 @@ void main()
     AppendLightResult(lightsResult, ComputeSpotLights(cache));
 
     vec3 resultColor = (lightsResult.ambient + lightsResult.diffuse + lightsResult.specular) * fragmentColor;
-    FragColor = vec4(resultColor, 1.0f);
+    FragColor = vec4(resultColor, materialDiffuse.a);
 }

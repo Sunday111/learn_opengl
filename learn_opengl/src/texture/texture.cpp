@@ -3,9 +3,9 @@
 #include <fstream>
 
 #include "fmt/format.h"
-#include "gl_api.hpp"
 #include "image_loader.hpp"
 #include "nlohmann/json.hpp"
+#include "opengl/gl_api.hpp"
 
 static auto get_texture_json(std::string_view path) {
   std::ifstream f(path.data());
@@ -56,7 +56,7 @@ std::shared_ptr<Texture> Texture::LoadFrom(
   OpenGl::BindTexture2d(gl_texture);
 
   size_t lod = 0;
-  OpenGl::TexImage2d(GL_TEXTURE_2D, lod, GL_RGB, image.GetWidth(),
+  OpenGl::TexImage2d(GL_TEXTURE_2D, lod, GL_RGBA, image.GetWidth(),
                      image.GetHeight(), GL_RGBA, GL_UNSIGNED_BYTE,
                      image.GetData().data());
   OpenGl::GenerateMipmap2d();

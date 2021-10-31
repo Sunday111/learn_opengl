@@ -1,5 +1,5 @@
 {
-    "image": "container.png",
+    "image": "container_transparent.png",
     "wrap": {
         "S": "ClampToEdge",
         "T": "ClampToEdge",

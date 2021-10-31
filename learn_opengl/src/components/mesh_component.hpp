@@ -4,7 +4,7 @@
 #include <string>
 
 #include "components/component.hpp"
-#include "gl_api.hpp"
+#include "opengl/gl_api.hpp"
 #include "wrap/wrap_glm.hpp"
 
 class Shader;
