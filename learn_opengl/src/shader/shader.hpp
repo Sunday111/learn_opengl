@@ -46,6 +46,7 @@ class Shader {
   }
 
   void SendUniforms();
+  void SendUniform(UniformHandle&);
 
   template <typename T>
   const T& GetDefineValue(DefineHandle& handle) const;

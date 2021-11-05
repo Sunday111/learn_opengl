@@ -379,6 +379,11 @@ void Shader::SendUniforms() {
   }
 }
 
+void Shader::SendUniform(UniformHandle& handle) {
+  ShaderUniform& uniform = GetUniform(handle);
+  uniform.SendValue();
+}
+
 void Shader::Check() const {
   [[unlikely]] if (!program_) { throw std::runtime_error("Invalid shader"); }
 }
