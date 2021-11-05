@@ -3,9 +3,9 @@
 #include <fstream>
 
 #include "fmt/format.h"
-#include "image_loader.hpp"
 #include "nlohmann/json.hpp"
 #include "opengl/gl_api.hpp"
+#include "texture/image_loader.hpp"
 
 static auto get_texture_json(std::string_view path) {
   std::ifstream f(path.data());

@@ -14,7 +14,6 @@
 #include "components/mesh_component.hpp"
 #include "components/transform_component.hpp"
 #include "entities/entity.hpp"
-#include "image_loader.hpp"
 #include "integer.hpp"
 #include "name_cache/name_cache.hpp"
 #include "opengl/debug/annotations.hpp"
