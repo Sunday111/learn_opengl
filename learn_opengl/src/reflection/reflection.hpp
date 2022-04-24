@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cstring>
 #include <iostream>
+#include <limits>
 #include <optional>
 #include <string_view>
 #include <tuple>
@@ -17,6 +18,9 @@ namespace reflection {
 
 template <typename T>
 struct TypeReflector;
+
+template <typename T>
+ui32 GetTypeId();
 
 struct TypeVariable {
   [[nodiscard]] void* GetPtr(void* base) const noexcept;

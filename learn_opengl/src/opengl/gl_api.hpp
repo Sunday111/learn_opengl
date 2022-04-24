@@ -379,7 +379,7 @@ constexpr bool OpenGl::TryParse(std::string_view str,
 }
 
 template <typename T>
-[[nodiscard]] static constexpr T OpenGl::Parse(std::string_view str) {
+[[nodiscard]] constexpr T OpenGl::Parse(std::string_view str) {
   T out;
   [[likely]] if (TryParse(str, out)) { return out; }
   throw std::runtime_error(

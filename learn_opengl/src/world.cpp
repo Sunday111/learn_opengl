@@ -4,6 +4,7 @@
 
 #include <stdexcept>
 
+#include "components/component.hpp"
 #include "entities/entity.hpp"
 #include "memory/memory.hpp"
 

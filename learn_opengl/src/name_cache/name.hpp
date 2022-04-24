@@ -1,5 +1,6 @@
 #pragma once
 
+#include <limits>
 #include <string_view>
 
 #include "integer.hpp"
@@ -18,12 +19,12 @@ class Name {
 
   std::string_view GetView() const;
 
-  friend [[nodiscard]] inline bool operator==(const Name& a,
+  [[nodiscard]] friend inline bool operator==(const Name& a,
                                               const Name& b) noexcept {
     return a.id_ == b.id_;
   }
 
-  friend [[nodiscard]] inline bool operator<(const Name& a,
+  [[nodiscard]] friend inline bool operator<(const Name& a,
                                              const Name& b) noexcept {
     return a.id_ < b.id_;
   }

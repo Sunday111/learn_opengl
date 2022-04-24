@@ -96,7 +96,9 @@
         "csignal": "cpp",
         "valarray": "cpp",
         "queue": "cpp",
-        "stack": "cpp"
+        "stack": "cpp",
+        "numbers": "cpp",
+        "semaphore": "cpp"
     },
     "cmake.generator": "Ninja",
     "editor.formatOnSave": true,

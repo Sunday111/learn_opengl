@@ -18,9 +18,9 @@ void CameraComponent::AddInput(glm::vec3 YawPitchRoll) {
   r += YawPitchRoll * glm::vec3(1.0f, -1.0f, 1.0f);
   r.y = std::clamp(r.y, glm::radians(-89.0f), glm::radians(89.0f));
 
-  front.x = sin(r.x) * cos(r.y);
-  front.y = cos(r.x) * cos(r.y);
-  front.z = sin(r.y);
+  front.x = std::sin(r.x) * std::cos(r.y);
+  front.y = std::cos(r.x) * std::cos(r.y);
+  front.z = std::sin(r.y);
   front = glm::normalize(front);
 }
 
