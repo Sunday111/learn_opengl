@@ -493,7 +493,9 @@ void Shader::UpdateUniforms() {
       uniform.SetType(*cpp_type);
     }
 
-    uniforms.back().SetLocation(static_cast<ui32>(i));
+    const GLint location =
+        glGetUniformLocation(*program_, variable_name.GetView().data());
+    uniforms.back().SetLocation(location);
   }
 
   std::swap(uniforms, uniforms_);

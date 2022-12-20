@@ -1,4 +1,5 @@
 {
+    "clang-format.executable": "C:/Program Files/LLVM/bin/clang-format.exe",
     "files.associations": {
         "array": "cpp",
         "bit": "cpp",
