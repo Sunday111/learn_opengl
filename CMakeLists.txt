@@ -1,47 +1,25 @@
 cmake_minimum_required(VERSION 3.16)
+
 project(learn_opengl)
 
-include(ExternalProject)
+set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};${CMAKE_CURRENT_SOURCE_DIR}/dep/sunday_cmake_presets")
+
 include(CheckIPOSupported)
+include(enable_lto)
 
 if(POLICY CMP0048)
   cmake_policy(SET CMP0048 NEW)
 endif(POLICY CMP0048)
 
-if(POLICY CMP0069)
-  cmake_policy(SET CMP0069 NEW)
-endif(POLICY CMP0069)
-
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_program(GIT_EXECUTABLE git)
 find_package(OpenGL REQUIRED)
-
-set(SPDLOG_FMT_EXTERNAL ON CACHE BOOL "")
 
 check_ipo_supported(RESULT ipo_supported)
 
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/dep/tinyobjloader)
+enable_lto_globally()
 
-if(ipo_supported)
-  set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
-endif()
-
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/dep/fmt)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/dep/spdlog)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/dep/glfw)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/dep/glm)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/dep/glad)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/dep/stb)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/dep/imgui)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/dep/json)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/dep)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/learn_opengl)
-
-# # prints all cmake variables
-# get_cmake_property(_variableNames VARIABLES)
-# list (SORT _variableNames)
-# foreach (_variableName ${_variableNames})
-# message("${_variableName}=${${_variableName}}")
-# endforeach()

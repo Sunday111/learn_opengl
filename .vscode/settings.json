@@ -1,6 +1,11 @@
 {
     "clang-format.executable": "C:/Program Files/LLVM/bin/clang-format.exe",
-    "ccmake.generator": "Ninja",
+    "cmake.generator": "Ninja",
+    "cfiles.exclude": {
+        "**/.git": false
+    },
+    "editor.formatOnSave": true,
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
     "files.associations": {
         "array": "cpp",
         "bit": "cpp",
@@ -101,7 +106,5 @@
         "stack": "cpp",
         "numbers": "cpp",
         "semaphore": "cpp"
-    },
-    "editor.formatOnSave": true,
-    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools"
+    }
 }
