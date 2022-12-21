@@ -9,20 +9,22 @@ set(shaders_dir_rel ${content_dir_rel}/shaders)
 set(textures_dir_rel ${content_dir_rel}/textures)
 set(models_dir_rel ${content_dir_rel}/models)
 
-set(src_content_dir  ${CMAKE_CURRENT_SOURCE_DIR}/${content_dir_rel})
-set(src_shaders_dir  ${CMAKE_CURRENT_SOURCE_DIR}/${shaders_dir_rel})
+set(src_content_dir ${CMAKE_CURRENT_SOURCE_DIR}/${content_dir_rel})
+set(src_shaders_dir ${CMAKE_CURRENT_SOURCE_DIR}/${shaders_dir_rel})
 set(src_textures_dir ${CMAKE_CURRENT_SOURCE_DIR}/${textures_dir_rel})
 set(src_models_dir ${CMAKE_CURRENT_SOURCE_DIR}/${models_dir_rel})
 
-set(dst_content_dir  ${CMAKE_CURRENT_BINARY_DIR}/${content_dir_rel})
-set(dst_shaders_dir  ${CMAKE_CURRENT_BINARY_DIR}/${shaders_dir_rel})
+set(dst_content_dir ${CMAKE_CURRENT_BINARY_DIR}/${content_dir_rel})
+set(dst_shaders_dir ${CMAKE_CURRENT_BINARY_DIR}/${shaders_dir_rel})
 set(dst_textures_dir ${CMAKE_CURRENT_BINARY_DIR}/${textures_dir_rel})
 set(dst_models_dir ${CMAKE_CURRENT_BINARY_DIR}/${models_dir_rel})
 
 file(GLOB_RECURSE headers_list "${target_src_root}/*.hpp")
 file(GLOB_RECURSE sources_list "${target_src_root}/*.cpp")
 
-add_executable( ${target_name}
+option(ENABLE_RENDER_ANNOTATIONS "Whether rendering annotations should be enabled" OFF)
+
+add_executable(${target_name}
 	${headers_list}
 	${sources_list}
 	"${CMAKE_CURRENT_SOURCE_DIR}/learn_opengl.natvis")
@@ -92,7 +94,7 @@ else()
 		-Wsign-conversion # (Clang all versions, GCC >= 4.3) warn on sign conversions
 	)
 
-	if (CMAKE_CXX_COMPILER_ID STREQUAL "GCC")
+	if(CMAKE_CXX_COMPILER_ID STREQUAL "GCC")
 		list(APPEND compile_opts
 			-Wduplicated-cond # (only in GCC >= 6.0) warn if if / else chain has duplicated conditions
 			-Wduplicated-branches # (only in GCC >= 7.0) warn if if / else branches have duplicated code
@@ -101,50 +103,19 @@ else()
 		)
 	elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 		# only special branch of Clang currently but it is really helpful
-		#list(APPEND compile_opts
-		#	-Wlifetime # shows object lifetime issues
-		#)
+		# list(APPEND compile_opts
+		# -Wlifetime # shows object lifetime issues
+		# )
 	endif()
 endif()
 
 target_compile_options(${target_name} PRIVATE ${compile_opts})
 
-function(copy_content_fn)
-	set(options)
-	set(oneValueArgs TARGET SRC DST)
-	set(multiValueArgs)
-	cmake_parse_arguments(copy_content_fn "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+if(ENABLE_RENDER_ANNOTATIONS)
+	target_compile_definitions(${target_name} PUBLIC "ENABLE_RENDER_ANNOTATIONS")
+endif()
 
-	# gather source file paths relative to root
-	file(GLOB_RECURSE files_list RELATIVE ${copy_content_fn_SRC} "${copy_content_fn_SRC}/**")
-
-	add_custom_target(${copy_content_fn_TARGET})
-
-	# generate copy commands for each file
-	foreach(file_src_rel ${files_list})
-		set(file_src_abs ${copy_content_fn_SRC}/${file_src_rel})
-		set(file_dst_abs ${copy_content_fn_DST}/${file_src_rel})
-
-		# create desctination directory
-		get_filename_component(file_dst_dir ${file_dst_abs} DIRECTORY)
-		file(MAKE_DIRECTORY ${file_dst_dir})
-
-		add_custom_command(
-			TARGET ${copy_content_fn_TARGET}
-			COMMAND ${CMAKE_COMMAND} -E copy_if_different ${file_src_abs} ${file_dst_abs}
-			MAIN_DEPENDENCY ${file_src_abs})
-	endforeach()
-endfunction()
-
-add_custom_target(copy_content)
-add_dependencies(${target_name} copy_content)
-
-copy_content_fn(TARGET copy_textures SRC ${src_textures_dir} DST ${dst_textures_dir})
-add_dependencies(copy_content copy_textures)
-
-copy_content_fn(TARGET copy_models SRC ${src_models_dir} DST ${dst_models_dir})
-add_dependencies(copy_content copy_models)
-
-copy_content_fn(TARGET copy_shaders SRC ${src_shaders_dir} DST ${dst_shaders_dir})
-add_dependencies(copy_content copy_shaders)
-
+add_custom_command(TARGET ${target_name}
+	POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory
+	${src_content_dir}
+	$<TARGET_FILE_DIR:${target_name}>/content)
