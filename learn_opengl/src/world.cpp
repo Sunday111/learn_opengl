@@ -4,6 +4,7 @@
 
 #include <stdexcept>
 
+#include "CppReflection/GetStaticTypeInfo.hpp"
 #include "components/component.hpp"
 #include "entities/entity.hpp"
 #include "memory/memory.hpp"
@@ -16,14 +17,18 @@ void World::EntityDeleter::operator()(Entity* entity) const {
 World::World() = default;
 World::~World() = default;
 
-Entity& World::SpawnEntity(ui32 type_id) {
-  const reflection::TypeHandle type_info{type_id};
-  [[unlikely]] if (!type_info.IsA<Entity>()) {
+Entity& World::SpawnEntity(edt::GUID guid) {
+  constexpr edt::GUID entity_type_guid =
+      cppreflection::GetStaticTypeInfo<Entity>().guid;
+  const cppreflection::Type* type_info =
+      cppreflection::GetTypeRegistry()->FindType(guid);
+  [[unlikely]] if (!type_info->IsA(entity_type_guid)) {
     throw std::runtime_error(
-        fmt::format("{} is not an entity", type_info->name));
+        fmt::format("{} is not an entity", type_info->GetName()));
   }
-  void* memory = Memory::AlignedAlloc(type_info->size, type_info->alignment);
-  type_info->default_constructor(memory);
+  void* memory = Memory::AlignedAlloc(type_info->GetInstanceSize(),
+                                      type_info->GetAlignment());
+  type_info->GetSpecialMembers().defaultConstructor(memory);
   EntityPtr entity(reinterpret_cast<Entity*>(memory));
   entity->SetId(next_entity_id_++);
   entity->SetName(fmt::format("Entity {}", entity->GetId()));

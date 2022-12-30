@@ -9,12 +9,11 @@
 #include <string_view>
 #include <vector>
 
+#include "CppReflection/TypeRegistry.hpp"
 #include "components/type_id_widget.hpp"
 #include "nlohmann/json.hpp"
 #include "read_file.hpp"
 #include "reflection/glm_reflect.hpp"
-#include "reflection/predefined.hpp"
-#include "reflection/reflection.hpp"
 #include "shader/sampler_uniform.hpp"
 #include "shader/shader.hpp"
 #include "shader/shader_define.hpp"
@@ -207,7 +206,7 @@ void Shader::DrawDetails() {
   if (ImGui::TreeNode("Static Variables")) {
     for (ShaderDefine& definition : defines_) {
       bool value_changed = false;
-      SimpleTypeWidget(definition.type_id, definition.name.GetView(),
+      SimpleTypeWidget(definition.type_guid, definition.name.GetView(),
                        definition.value.data(), value_changed);
 
       if (value_changed) {
@@ -222,24 +221,25 @@ void Shader::DrawDetails() {
 
   if (ImGui::TreeNode("Dynamic Variables")) {
     for (ShaderUniform& uniform : uniforms_) {
-      auto type_info = reflection::GetTypeInfo(uniform.GetType());
+      auto type_info =
+          cppreflection::GetTypeRegistry()->FindType(uniform.GetTypeGUID());
 
-      type_info->copy_constructor((void*)stack_val_arr,
-                                  uniform.GetValue().data());
-      assert(stack_val_bytes >= type_info->size);
+      type_info->GetSpecialMembers().copyAssign((void*)stack_val_arr,
+                                                uniform.GetValue().data());
+      assert(stack_val_bytes >= type_info->GetInstanceSize());
 
       std::span<ui8> val_view(reinterpret_cast<ui8*>(stack_val_arr),
-                              type_info->size);
+                              type_info->GetInstanceSize());
 
       bool value_changed = false;
-      SimpleTypeWidget(uniform.GetType(), uniform.GetName().GetView(),
+      SimpleTypeWidget(uniform.GetTypeGUID(), uniform.GetName().GetView(),
                        val_view.data(), value_changed);
 
       if (value_changed) {
         uniform.SetValue(val_view);
       }
 
-      type_info->destructor(val_view.data());
+      type_info->GetSpecialMembers().destructor(val_view.data());
     }
     ImGui::TreePop();
   }
@@ -250,29 +250,30 @@ void Shader::DrawDetails() {
 }
 
 std::span<const ui8> Shader::GetDefineValue(DefineHandle& handle,
-                                            ui32 type_id) const {
+                                            edt::GUID type_guid) const {
   UpdateDefineHandle(handle);
 
   auto& define = defines_[handle.index];
-  [[unlikely]] if (define.type_id != type_id) {
+  [[unlikely]] if (define.type_guid != type_guid) {
+    auto type_registry = cppreflection::GetTypeRegistry();
     throw std::runtime_error(fmt::format(
         "Trying to interpret define {} of type {} as {}", define.name.GetView(),
-        reflection::GetTypeInfo(define.type_id)->name,
-        reflection::GetTypeInfo(type_id)->name));
+        type_registry->FindType(define.type_guid)->GetName(),
+        type_registry->FindType(type_guid)->GetName()));
   }
 
   return define.value;
 }
 
-void Shader::SetDefineValue(DefineHandle& handle, ui32 type_id,
+void Shader::SetDefineValue(DefineHandle& handle, edt::GUID type_guid,
                             std::span<const ui8> value) {
   UpdateDefineHandle(handle);
   ShaderDefine& define = defines_[handle.index];
   define.SetValue(value);
   need_recompile_ = true;
 
-  [[unlikely]] if (define.type_id !=
-                   type_id) throw std::runtime_error(fmt::format("wrong type"));
+  [[unlikely]] if (define.type_guid != type_guid) throw std::runtime_error(
+      fmt::format("wrong type"));
 }
 
 std::optional<DefineHandle> Shader::FindDefine(Name name) const noexcept {
@@ -336,9 +337,9 @@ const ShaderUniform& Shader::GetUniform(UniformHandle& handle) const {
 }
 
 std::span<const ui8> Shader::GetUniformValueViewRaw(UniformHandle& handle,
-                                                    ui32 type_id) const {
+                                                    edt::GUID type_guid) const {
   auto& uniform = GetUniform(handle);
-  uniform.EnsureTypeMatch(type_id);
+  uniform.EnsureTypeMatch(type_guid);
   return uniform.GetValue();
 }
 
@@ -356,11 +357,10 @@ void Shader::UpdateDefineHandle(DefineHandle& handle) const {
   }
 }
 
-void Shader::SetUniform(UniformHandle& handle, ui32 type_id,
+void Shader::SetUniform(UniformHandle& handle, edt::GUID type_guid,
                         std::span<const ui8> value) {
   auto& uniform = GetUniform(handle);
-  uniform.EnsureTypeMatch(type_id);
-  reflection::TypeHandle type_handle{uniform.GetType()};
+  uniform.EnsureTypeMatch(type_guid);
   uniform.SetValue(value);
 }
 
@@ -395,38 +395,38 @@ void Shader::Destroy() {
   }
 }
 
-std::optional<ui32> ConvertGlType(GLenum gl_type) {
+static std::optional<edt::GUID> ConvertGlType(GLenum gl_type) {
   switch (gl_type) {
     case GL_FLOAT:
-      return reflection::GetTypeId<float>();
+      return cppreflection::GetStaticTypeInfo<float>().guid;
       break;
 
     case GL_FLOAT_VEC2:
-      return reflection::GetTypeId<glm::vec2>();
+      return cppreflection::GetStaticTypeInfo<glm::vec2>().guid;
       break;
 
     case GL_FLOAT_VEC3:
-      return reflection::GetTypeId<glm::vec3>();
+      return cppreflection::GetStaticTypeInfo<glm::vec3>().guid;
       break;
 
     case GL_FLOAT_VEC4:
-      return reflection::GetTypeId<glm::vec4>();
+      return cppreflection::GetStaticTypeInfo<glm::vec4>().guid;
       break;
 
     case GL_FLOAT_MAT3:
-      return reflection::GetTypeId<glm::mat3>();
+      return cppreflection::GetStaticTypeInfo<glm::mat3>().guid;
       break;
 
     case GL_FLOAT_MAT4:
-      return reflection::GetTypeId<glm::mat4>();
+      return cppreflection::GetStaticTypeInfo<glm::mat4>().guid;
       break;
 
     case GL_SAMPLER_2D:
-      return reflection::GetTypeId<SamplerUniform>();
+      return cppreflection::GetStaticTypeInfo<SamplerUniform>().guid;
       break;
   }
 
-  return std::optional<ui32>();
+  return std::optional<edt::GUID>();
 }
 
 void Shader::UpdateUniforms() {
@@ -466,14 +466,12 @@ void Shader::UpdateUniforms() {
         name_buffer, static_cast<size_t>(actual_name_length));
     const Name variable_name(variable_name_view);
 
-    const std::optional<ui32> cpp_type = ConvertGlType(glsl_type);
+    const std::optional<edt::GUID> cpp_type = ConvertGlType(glsl_type);
     if (!cpp_type) {
       spdlog::warn("Skip variable {} in \"{}\" - unsupported type",
                    variable_name_view, path_.string());
       continue;
     }
-
-    const reflection::TypeHandle type_handle{*cpp_type};
 
     // find existing variable
     auto found_uniform_it = std::find_if(
@@ -483,7 +481,7 @@ void Shader::UpdateUniforms() {
     if (found_uniform_it != uniforms_.end()) {
       uniforms.push_back(std::move(*found_uniform_it));
       // the previous value can be saved only if variable has the same type
-      if (*cpp_type != found_uniform_it->GetType()) {
+      if (*cpp_type != found_uniform_it->GetTypeGUID()) {
         uniforms.back().SetType(*cpp_type);
       }
     } else {
@@ -502,7 +500,9 @@ void Shader::UpdateUniforms() {
 
   for (size_t i = 0; i < uniforms_.size(); ++i) {
     ShaderUniform& uniform = uniforms_[i];
-    if (uniform.GetType() == reflection::GetTypeId<SamplerUniform>()) {
+    constexpr edt::GUID sampler_uniform_guid =
+        cppreflection::GetStaticTypeInfo<SamplerUniform>().guid;
+    if (uniform.GetTypeGUID() == sampler_uniform_guid) {
       UniformHandle handle{static_cast<ui32>(i), uniform.GetName()};
       auto sampler = GetUniformValue<SamplerUniform>(handle);
       sampler.sampler_index = static_cast<ui8>(i);

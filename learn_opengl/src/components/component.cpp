@@ -4,5 +4,5 @@
 
 void Component::DrawDetails() {
   bool value_changed = false;
-  TypeIdWidget(GetTypeId(), this, value_changed);
+  TypeIdWidget(GetTypeGUID(), this, value_changed);
 }

@@ -4,6 +4,8 @@
 
 #include <stdexcept>
 
+#include "CppReflection/TypeRegistry.hpp"
+#include "EverydayTools/GUID_fmtlib.hpp"
 #include "components/component.hpp"
 #include "imgui.h"
 #include "memory/memory.hpp"
@@ -15,18 +17,28 @@ void Entity::ComponentDeleter::operator()(Component* component) const {
 
 Entity::Entity() = default;
 Entity::~Entity() noexcept = default;
-ui32 Entity::GetTypeId() const noexcept {
-  return reflection::GetTypeId<Entity>();
+edt::GUID Entity::GetTypeGUID() const noexcept {
+  return cppreflection::GetStaticTypeInfo<Entity>().guid;
 }
 
-Component* Entity::AddComponent(ui32 type_id) {
-  reflection::TypeHandle type_info{type_id};
-  [[unlikely]] if (!type_info.IsA<Component>()) {
-    throw std::runtime_error(
-        fmt::format("{} is not a component", type_info->name));
+Component* Entity::AddComponent(edt::GUID type_guid) {
+  cppreflection::TypeRegistry* type_registry = cppreflection::GetTypeRegistry();
+  const cppreflection::Type* type_info = type_registry->FindType(type_guid);
+
+  if (!type_info) {
+    throw std::runtime_error(fmt::format("Unknown type: {}", type_guid));
   }
-  void* memory = Memory::AlignedAlloc(type_info->size, type_info->alignment);
-  type_info->default_constructor(memory);
+
+  constexpr edt::GUID component_guid =
+      cppreflection::GetStaticTypeInfo<Component>().guid;
+
+  [[unlikely]] if (!type_info->IsA(component_guid)) {
+    throw std::runtime_error(
+        fmt::format("{} is not a component", type_info->GetName()));
+  }
+  void* memory = Memory::AlignedAlloc(type_info->GetInstanceSize(),
+                                      type_info->GetAlignment());
+  type_info->GetSpecialMembers().defaultConstructor(memory);
   ComponentPtr component(reinterpret_cast<Component*>(memory));
   components_.push_back(std::move(component));
   return components_.back().get();

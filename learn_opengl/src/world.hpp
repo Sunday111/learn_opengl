@@ -3,8 +3,8 @@
 #include <memory>
 #include <vector>
 
+#include "CppReflection/GetStaticTypeInfo.hpp"
 #include "integer.hpp"
-#include "reflection/reflection.hpp"
 
 class Entity;
 
@@ -16,7 +16,7 @@ class World {
   template <typename T>
   T& SpawnEntity();
   void ForEachEntity(auto&& fn);
-  Entity& SpawnEntity(ui32 type_id);
+  Entity& SpawnEntity(edt::GUID type_id);
 
   [[nodiscard]] inline size_t GetNumEntities() const noexcept {
     return entities_.size();
@@ -48,7 +48,6 @@ void World::ForEachEntity(auto&& fn) {
 
 template <typename T>
 T& World::SpawnEntity() {
-  const ui32 type_id = reflection::GetTypeId<T>();
-  Entity& entity_base = SpawnEntity(type_id);
+  Entity& entity_base = SpawnEntity(cppreflection::GetStaticTypeInfo<T>().guid);
   return static_cast<T&>(entity_base);
 }

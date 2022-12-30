@@ -1,6 +1,5 @@
 {
     "clang-format.executable": "C:/Program Files/LLVM/bin/clang-format.exe",
-    "cmake.generator": "Ninja",
     "cfiles.exclude": {
         "**/.git": false
     },

@@ -2,8 +2,8 @@
 
 #include <memory>
 
+#include "CppReflection/GetStaticTypeInfo.hpp"
 #include "integer.hpp"
-#include "reflection/reflection.hpp"
 #include "texture/texture.hpp"
 
 class SamplerUniform {
@@ -12,12 +12,13 @@ class SamplerUniform {
   std::shared_ptr<Texture> texture;
 };
 
-namespace reflection {
+namespace cppreflection {
 template <>
-struct TypeReflector<SamplerUniform> {
-  static void ReflectType(TypeHandle handle) {
-    handle->name = "SamplerUniform";
-    handle->guid = "2FBEEB94-BBB3-491C-A299-AD1960641D3F";
+struct TypeReflectionProvider<SamplerUniform> {
+  [[nodiscard]] inline constexpr static auto ReflectType() {
+    return StaticClassTypeInfo<SamplerUniform>(
+        "SamplerUniform",
+        edt::GUID::Create("2FBEEB94-BBB3-491C-A299-AD1960641D3F"));
   }
 };
-}  // namespace reflection
+}  // namespace cppreflection

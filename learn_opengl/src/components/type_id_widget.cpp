@@ -1,17 +1,19 @@
 #include "components/type_id_widget.hpp"
 
+#include "CppReflection/GetStaticTypeInfo.hpp"
+#include "CppReflection/TypeRegistry.hpp"
 #include "integer.hpp"
 #include "reflection/glm_reflect.hpp"
-#include "reflection/predefined.hpp"
 #include "wrap/wrap_glm.hpp"
 #include "wrap/wrap_imgui.h"
 
 template <typename T>
-bool ScalarProperty(ui32 type_id, std::string_view name, void* address,
+bool ScalarProperty(edt::GUID type_guid, std::string_view name, void* address,
                     bool& value_changed,
                     T min = std::numeric_limits<T>::lowest(),
                     T max = std::numeric_limits<T>::max()) {
-  if (type_id == reflection::GetTypeId<T>()) {
+  constexpr auto type_info = cppreflection::GetStaticTypeInfo<T>();
+  if (type_info.guid == type_guid) {
     const char* format = "%.3f";
     if constexpr (std::is_floating_point_v<T>) {
       format = "%d";
@@ -37,9 +39,10 @@ bool VectorProperty(std::string_view title, glm::vec<N, T>& value,
 }
 
 template <typename T>
-bool VectorProperty(ui32 type_id, std::string_view name, void* address,
+bool VectorProperty(edt::GUID type_guid, std::string_view name, void* address,
                     bool& value_changed) {
-  if (type_id == reflection::GetTypeId<T>()) {
+  constexpr auto type_info = cppreflection::GetStaticTypeInfo<T>();
+  if (type_info.guid == type_guid) {
     T& member_ref = *reinterpret_cast<T*>(address);
     value_changed |= VectorProperty(name, member_ref);
     return true;
@@ -70,9 +73,10 @@ bool MatrixProperty(const std::string_view title, glm::mat<C, R, T>& value,
 }
 
 template <typename T>
-bool MatrixProperty(ui32 type_id, std::string_view name, void* address,
+bool MatrixProperty(edt::GUID type_guid, std::string_view name, void* address,
                     bool& value_changed) {
-  if (type_id == reflection::GetTypeId<T>()) {
+  constexpr auto type_info = cppreflection::GetStaticTypeInfo<T>();
+  if (type_info.guid == type_guid) {
     T& member_ref = *reinterpret_cast<T*>(address);
     value_changed |= MatrixProperty(name, member_ref);
     return true;
@@ -81,33 +85,34 @@ bool MatrixProperty(ui32 type_id, std::string_view name, void* address,
   return false;
 }
 
-void SimpleTypeWidget(ui32 type_id, std::string_view name, void* value,
+void SimpleTypeWidget(edt::GUID type_guid, std::string_view name, void* value,
                       bool& value_changed) {
   value_changed = false;
   [[maybe_unused]] const bool found_type =
-      ScalarProperty<float>(type_id, name, value, value_changed) ||
-      ScalarProperty<double>(type_id, name, value, value_changed) ||
-      ScalarProperty<ui8>(type_id, name, value, value_changed) ||
-      ScalarProperty<ui16>(type_id, name, value, value_changed) ||
-      ScalarProperty<ui32>(type_id, name, value, value_changed) ||
-      ScalarProperty<ui64>(type_id, name, value, value_changed) ||
-      ScalarProperty<i8>(type_id, name, value, value_changed) ||
-      ScalarProperty<i16>(type_id, name, value, value_changed) ||
-      ScalarProperty<i32>(type_id, name, value, value_changed) ||
-      ScalarProperty<i64>(type_id, name, value, value_changed) ||
-      VectorProperty<glm::vec2>(type_id, name, value, value_changed) ||
-      VectorProperty<glm::vec3>(type_id, name, value, value_changed) ||
-      VectorProperty<glm::vec4>(type_id, name, value, value_changed) ||
-      MatrixProperty<glm::mat4>(type_id, name, value, value_changed);
+      ScalarProperty<float>(type_guid, name, value, value_changed) ||
+      ScalarProperty<double>(type_guid, name, value, value_changed) ||
+      ScalarProperty<ui8>(type_guid, name, value, value_changed) ||
+      ScalarProperty<ui16>(type_guid, name, value, value_changed) ||
+      ScalarProperty<ui32>(type_guid, name, value, value_changed) ||
+      ScalarProperty<ui64>(type_guid, name, value, value_changed) ||
+      ScalarProperty<i8>(type_guid, name, value, value_changed) ||
+      ScalarProperty<i16>(type_guid, name, value, value_changed) ||
+      ScalarProperty<i32>(type_guid, name, value, value_changed) ||
+      ScalarProperty<i64>(type_guid, name, value, value_changed) ||
+      VectorProperty<glm::vec2>(type_guid, name, value, value_changed) ||
+      VectorProperty<glm::vec3>(type_guid, name, value, value_changed) ||
+      VectorProperty<glm::vec4>(type_guid, name, value, value_changed) ||
+      MatrixProperty<glm::mat4>(type_guid, name, value, value_changed);
 }
 
-void TypeIdWidget(ui32 type_id, void* base, bool& value_changed) {
-  reflection::TypeHandle type_info{type_id};
-  for (const reflection::TypeVariable& variable : type_info->variables) {
-    void* pmember =
-        reinterpret_cast<void*>(reinterpret_cast<ui64>(base) + variable.offset);
+void TypeIdWidget(edt::GUID type_guid, void* base, bool& value_changed) {
+  const cppreflection::Type* type_info =
+      cppreflection::GetTypeRegistry()->FindType(type_guid);
+  for (const cppreflection::Field* field : type_info->GetFields()) {
+    void* pmember = field->GetValue(base);
     bool member_changed = false;
-    SimpleTypeWidget(variable.type_id, variable.name, pmember, member_changed);
+    SimpleTypeWidget(field->GetType()->GetGuid(), field->GetName(), pmember,
+                     member_changed);
     value_changed |= member_changed;
   }
 }

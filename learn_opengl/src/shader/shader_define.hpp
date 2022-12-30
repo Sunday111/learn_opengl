@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "EverydayTools/GUID.hpp"
 #include "integer.hpp"
 #include "name_cache/name.hpp"
 #include "nlohmann/json.hpp"
@@ -28,5 +29,5 @@ class ShaderDefine {
  public:
   std::vector<ui8> value;
   Name name;
-  ui32 type_id;
+  edt::GUID type_guid;
 };

@@ -5,7 +5,7 @@
 
 #include "components/component.hpp"
 #include "opengl/gl_api.hpp"
-#include "wrap/wrap_glm.hpp"
+#include "reflection/glm_reflect.hpp"
 
 class Shader;
 
@@ -43,13 +43,14 @@ class MeshComponent : public SimpleComponentBase<MeshComponent> {
   GLuint ebo_;  // element buffer object
 };
 
-namespace reflection {
+namespace cppreflection {
 template <>
-struct TypeReflector<MeshComponent> {
-  static void ReflectType(TypeHandle handle) {
-    handle->name = "MeshComponent";
-    handle->guid = "C3F58B85-406E-4C03-A5AF-4CF736813D57";
-    handle.SetBaseClass<Component>();
+struct TypeReflectionProvider<MeshComponent> {
+  [[nodiscard]] inline constexpr static auto ReflectType() {
+    return StaticClassTypeInfo<MeshComponent>(
+               "MeshComponent",
+               edt::GUID::Create("C3F58B85-406E-4C03-A5AF-4CF736813D57"))
+        .Base<Component>();
   }
 };
-}  // namespace reflection
+}  // namespace cppreflection

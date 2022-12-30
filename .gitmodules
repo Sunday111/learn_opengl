@@ -25,3 +25,12 @@
 [submodule "dep/sunday_cmake_presets"]
 	path = dep/sunday_cmake_presets
 	url = https://github.com/Sunday111/sunday_cmake_presets
+[submodule "dep/EverydayTools"]
+	path = dep/EverydayTools
+	url = https://github.com/Sunday111/EverydayTools
+[submodule "dep/CppReflection"]
+	path = dep/CppReflection
+	url = https://github.com/Sunday111/CppReflection
+[submodule "dep/google/googletest"]
+	path = dep/google/googletest
+	url = https://github.com/google/googletest

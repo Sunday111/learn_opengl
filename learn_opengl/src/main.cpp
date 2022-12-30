@@ -21,8 +21,7 @@
 #include "properties_widget.hpp"
 #include "read_file.hpp"
 #include "reflection/glm_reflect.hpp"
-#include "reflection/predefined.hpp"
-#include "reflection/reflection.hpp"
+#include "reflection/register_types.hpp"
 #include "render_system.hpp"
 #include "shader/shader.hpp"
 #include "template/class_member_traits.hpp"
@@ -154,175 +153,204 @@ void CreatePointLights(World& world, RenderSystem& render_system) {
   }
 }
 
-int main([[maybe_unused]] int argc, char** argv) {
-  try {
-    spdlog::set_level(spdlog::level::warn);
-    const std::filesystem::path exe_file = std::filesystem::path(argv[0]);
-    std::vector<std::unique_ptr<Window>> windows;
+void Main([[maybe_unused]] int argc, char** argv) {
+  spdlog::set_level(spdlog::level::warn);
+  const std::filesystem::path exe_file = std::filesystem::path(argv[0]);
+  RegisterReflectionTypes();
+  std::vector<std::unique_ptr<Window>> windows;
 
-    const auto content_dir = exe_file.parent_path() / "content";
-    const auto shaders_dir = content_dir / "shaders";
-    const auto textures_dir = content_dir / "textures";
-    const auto models_dir = content_dir / "models";
-    Shader::shaders_dir_ = content_dir / "shaders";
+  const auto content_dir = exe_file.parent_path() / "content";
+  const auto shaders_dir = content_dir / "shaders";
+  const auto textures_dir = content_dir / "textures";
+  const auto models_dir = content_dir / "models";
+  Shader::shaders_dir_ = content_dir / "shaders";
 
-    GlfwState glfw_state;
-    glfw_state.Initialize();
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  GlfwState glfw_state;
+  glfw_state.Initialize();
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 #ifndef NDEBUG
-    glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
+  glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
 #endif
 
-    windows.push_back(std::make_unique<Window>());
+  {
+    ui32 window_width = 800;
+    ui32 window_height = 800;
 
-    // GLAD can be initialized only when glfw has window context
-    windows.front()->MakeContextCurrent();
-    InitializeGLAD();
-
-    TextureManager texture_manager(textures_dir);
-
-    GlDebugMessenger::Start();
-    OpenGl::EnableDepthTest();
-
-    glfwSwapInterval(0);
-    ImGui::CreateContext();
-    ImGui::StyleColorsDark();
-    ImGui_ImplGlfw_InitForOpenGL(windows.back()->GetGlfwWindow(), true);
-    ImGui_ImplOpenGL3_Init("#version 130");
-
-    ProgramProperties properties;
-    ParametersWidget widget(&properties);
-
-    World world;
-
-    RenderSystem render_system(texture_manager);
-
-    //// Create entity with directional light component
-    //{
-    //  Entity& entity = world.SpawnEntity<Entity>();
-    //  const glm::vec3 light_color(1.0f, 1.0f, 1.0f);
-    //  entity.SetName("DirectionalLight");
-    //  auto& light = entity.AddComponent<DirectionalLightComponent>();
-    //  light.diffuse = light_color;
-    //  light.ambient = light_color * 0.1f;
-    //  light.specular = light_color;
-    //
-    //  auto& transform = entity.AddComponent<TransformComponent>();
-    //  transform.transform = glm::yawPitchRoll(
-    //      glm::radians(0.0f), glm::radians(0.0f), glm::radians(0.0f));
-    //
-    //  render_system.directional_lights_.push_back({&transform, &light});
-    //}
-    //
-    //// Create entity with spot light component
-    //{
-    //  Entity& entity = world.SpawnEntity<Entity>();
-    //  const glm::vec3 light_color(1.0f, 1.0f, 1.0f);
-    //  entity.SetName("SpotLight");
-    //  auto& light = entity.AddComponent<SpotLightComponent>();
-    //  light.diffuse = light_color;
-    //  light.specular = light_color;
-    //  light.innerAngle = glm::cos(glm::radians(12.5f));
-    //  light.outerAngle = glm::cos(glm::radians(15.0f));
-    //
-    //  auto& transform = entity.AddComponent<TransformComponent>();
-    //  transform.transform =
-    //      glm::translate(transform.transform, glm::vec3(0.0f, 0.0, 1.0f));
-    //  transform.transform *= glm::yawPitchRoll(
-    //      glm::radians(0.0f), glm::radians(-90.0f), glm::radians(0.0f));
-    //
-    //  render_system.spot_lights_.push_back({&transform, &light});
-    //}
-
-    // Create entity with camera component and link it with window
-    {
-      auto& entity = world.SpawnEntity<Entity>();
-      entity.SetName("Camera");
-      CameraComponent& camera = entity.AddComponent<CameraComponent>();
-      windows.back()->SetCamera(&camera);
-      entity.AddComponent<TransformComponent>();
+    if (GLFWmonitor* monitor = glfwGetPrimaryMonitor()) {
+      float x_scale, y_scale;
+      glfwGetMonitorContentScale(monitor, &x_scale, &y_scale);
+      window_width = static_cast<ui32>(window_width * x_scale);
+      window_height = static_cast<ui32>(window_height * y_scale);
     }
 
-    CreateMeshes(world, render_system.shader_);
-    CreatePointLights(world, render_system);
+    windows.push_back(std::make_unique<Window>(window_width, window_height));
+  }
 
-    UpdateProperties<true>(properties);
+  // GLAD can be initialized only when glfw has window context
+  windows.front()->MakeContextCurrent();
+  InitializeGLAD();
 
-    auto prev_frame_time = std::chrono::high_resolution_clock::now();
+  TextureManager texture_manager(textures_dir);
 
-    while (!windows.empty()) {
-      ScopeAnnotation frame_annotation("Frame");
-      const auto current_frame_time = std::chrono::high_resolution_clock::now();
-      const auto frame_delta_time =
-          std::chrono::duration<float, std::chrono::seconds::period>(
-              current_frame_time - prev_frame_time)
-              .count();
+  GlDebugMessenger::Start();
+  OpenGl::EnableDepthTest();
 
-      for (size_t i = 0; i < windows.size();) {
-        auto& window = windows[i];
+  glfwSwapInterval(0);
+  ImGui::CreateContext();
+  ImGui::StyleColorsDark();
+  ImGui_ImplGlfw_InitForOpenGL(windows.back()->GetGlfwWindow(), true);
+  ImGui_ImplOpenGL3_Init("#version 130");
 
-        [[unlikely]] if (window->ShouldClose()) {
-          auto erase_it = windows.begin();
-          std::advance(erase_it, i);
-          windows.erase(erase_it);
-          continue;
-        }
-        window->ProcessInput(frame_delta_time);
+  if (GLFWmonitor* monitor = glfwGetPrimaryMonitor()) {
+    float xscale, yscale;
+    glfwGetMonitorContentScale(monitor, &xscale, &yscale);
 
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
+    ImGui::GetStyle().ScaleAllSizes(2);
+    ImGuiIO& io = ImGui::GetIO();
 
-        properties.MarkAllChanged(false);
-        widget.Update();
+    ImFontConfig font_config{};
+    font_config.SizePixels = 13 * xscale;
+    io.Fonts->AddFontDefault(&font_config);
+  }
 
-        UpdateProperties(properties);
+  ProgramProperties properties;
+  ParametersWidget widget(&properties);
 
-        static int selected_entity_id = -1;
-        Entity* selected_entity = nullptr;
-        ImGui::Begin("Details");
-        ImGui::ListBox(
-            "Entities", &selected_entity_id,
-            [](void* data, int idx, const char** name) {
-              [[likely]] if (data) {
-                World* world = reinterpret_cast<World*>(data);
-                Entity* entity =
-                    world->GetEntityByIndex(static_cast<size_t>(idx));
-                [[likely]] if (entity) {
-                  *name = entity->GetName().data();
-                  return true;
-                }
+  World world;
+
+  RenderSystem render_system(texture_manager);
+
+  //// Create entity with directional light component
+  //{
+  //  Entity& entity = world.SpawnEntity<Entity>();
+  //  const glm::vec3 light_color(1.0f, 1.0f, 1.0f);
+  //  entity.SetName("DirectionalLight");
+  //  auto& light = entity.AddComponent<DirectionalLightComponent>();
+  //  light.diffuse = light_color;
+  //  light.ambient = light_color * 0.1f;
+  //  light.specular = light_color;
+  //
+  //  auto& transform = entity.AddComponent<TransformComponent>();
+  //  transform.transform = glm::yawPitchRoll(
+  //      glm::radians(0.0f), glm::radians(0.0f), glm::radians(0.0f));
+  //
+  //  render_system.directional_lights_.push_back({&transform, &light});
+  //}
+  //
+  //// Create entity with spot light component
+  //{
+  //  Entity& entity = world.SpawnEntity<Entity>();
+  //  const glm::vec3 light_color(1.0f, 1.0f, 1.0f);
+  //  entity.SetName("SpotLight");
+  //  auto& light = entity.AddComponent<SpotLightComponent>();
+  //  light.diffuse = light_color;
+  //  light.specular = light_color;
+  //  light.innerAngle = glm::cos(glm::radians(12.5f));
+  //  light.outerAngle = glm::cos(glm::radians(15.0f));
+  //
+  //  auto& transform = entity.AddComponent<TransformComponent>();
+  //  transform.transform =
+  //      glm::translate(transform.transform, glm::vec3(0.0f, 0.0, 1.0f));
+  //  transform.transform *= glm::yawPitchRoll(
+  //      glm::radians(0.0f), glm::radians(-90.0f), glm::radians(0.0f));
+  //
+  //  render_system.spot_lights_.push_back({&transform, &light});
+  //}
+
+  // Create entity with camera component and link it with window
+  {
+    auto& entity = world.SpawnEntity<Entity>();
+    entity.SetName("Camera");
+    CameraComponent& camera = entity.AddComponent<CameraComponent>();
+    windows.back()->SetCamera(&camera);
+    entity.AddComponent<TransformComponent>();
+  }
+
+  CreateMeshes(world, render_system.shader_);
+  CreatePointLights(world, render_system);
+
+  UpdateProperties<true>(properties);
+
+  auto prev_frame_time = std::chrono::high_resolution_clock::now();
+
+  while (!windows.empty()) {
+    ScopeAnnotation frame_annotation("Frame");
+    const auto current_frame_time = std::chrono::high_resolution_clock::now();
+    const auto frame_delta_time =
+        std::chrono::duration<float, std::chrono::seconds::period>(
+            current_frame_time - prev_frame_time)
+            .count();
+
+    for (size_t i = 0; i < windows.size();) {
+      auto& window = windows[i];
+
+      [[unlikely]] if (window->ShouldClose()) {
+        auto erase_it = windows.begin();
+        std::advance(erase_it, i);
+        windows.erase(erase_it);
+        continue;
+      }
+      window->ProcessInput(frame_delta_time);
+
+      ImGui_ImplOpenGL3_NewFrame();
+      ImGui_ImplGlfw_NewFrame();
+      ImGui::NewFrame();
+
+      properties.MarkAllChanged(false);
+      widget.Update();
+
+      UpdateProperties(properties);
+
+      static int selected_entity_id = -1;
+      Entity* selected_entity = nullptr;
+      ImGui::Begin("Details");
+      ImGui::ListBox(
+          "Entities", &selected_entity_id,
+          [](void* data, int idx, const char** name) {
+            [[likely]] if (data) {
+              World* world = reinterpret_cast<World*>(data);
+              Entity* entity =
+                  world->GetEntityByIndex(static_cast<size_t>(idx));
+              [[likely]] if (entity) {
+                *name = entity->GetName().data();
+                return true;
               }
+            }
 
-              return false;
-            },
-            &world, static_cast<int>(world.GetNumEntities()));
-        if (selected_entity_id >= 0) {
-          selected_entity =
-              world.GetEntityByIndex(static_cast<size_t>(selected_entity_id));
-          if (selected_entity) {
-            selected_entity->DrawDetails();
-          }
+            return false;
+          },
+          &world, static_cast<int>(world.GetNumEntities()));
+      if (selected_entity_id >= 0) {
+        selected_entity =
+            world.GetEntityByIndex(static_cast<size_t>(selected_entity_id));
+        if (selected_entity) {
+          selected_entity->DrawDetails();
         }
-        ImGui::End();
+      }
+      ImGui::End();
 
-        render_system.Render(*window, world, selected_entity);
+      render_system.Render(*window, world, selected_entity);
 
-        {
-          ScopeAnnotation imgui_render("ImGUI");
-          ImGui::Render();
-          ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-        }
-
-        window->SwapBuffers();
-        ++i;
+      {
+        ScopeAnnotation imgui_render("ImGUI");
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
       }
 
-      glfwPollEvents();
-      prev_frame_time = current_frame_time;
+      window->SwapBuffers();
+      ++i;
     }
+
+    glfwPollEvents();
+    prev_frame_time = current_frame_time;
+  }
+}
+
+int main(int argc, char** argv) {
+  try {
+    Main(argc, argv);
   } catch (const std::exception& e) {
     spdlog::critical("Unhandled exception: {}", e.what());
     return -1;

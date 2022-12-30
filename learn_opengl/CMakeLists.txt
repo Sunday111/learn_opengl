@@ -16,7 +16,7 @@ add_executable(${target_name}
 	${sources_list}
 	"${CMAKE_CURRENT_SOURCE_DIR}/learn_opengl.natvis")
 
-set_generic_compile_options(${target_name})
+set_generic_compile_options(${target_name} PUBLIC)
 target_link_libraries(${target_name}
 	stb
 	glad
@@ -27,6 +27,8 @@ target_link_libraries(${target_name}
 	imgui
 	tinyobjloader
 	nlohmann_json::nlohmann_json
+	CppReflection
+	EverydayTools
 	${OPENGL_LIBRARIES})
 target_compile_definitions(${target_name} PUBLIC
 	-DGLM_FORCE_RADIANS

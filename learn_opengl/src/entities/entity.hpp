@@ -4,8 +4,9 @@
 #include <string_view>
 #include <vector>
 
+#include "CppReflection/GetStaticTypeInfo.hpp"
+#include "EverydayTools/GUID.hpp"
 #include "integer.hpp"
-#include "reflection/reflection.hpp"
 
 class Component;
 
@@ -27,8 +28,8 @@ class Entity {
   void ForEachComp(F&& f);
   template <typename T>
   T& AddComponent();
-  [[nodiscard]] virtual ui32 GetTypeId() const noexcept;
-  Component* AddComponent(ui32 type_id);
+  [[nodiscard]] virtual edt::GUID GetTypeGUID() const noexcept;
+  Component* AddComponent(edt::GUID type_guid);
 
  private:
   class ComponentDeleter {
@@ -45,10 +46,12 @@ class Entity {
 
 template <typename T, typename F>
 void Entity::ForEachComp(F&& f) {
+  cppreflection::TypeRegistry* type_registry = cppreflection::GetTypeRegistry();
   for (auto& component : components_) {
-    const ui32 type_id = component->GetTypeId();
-    const reflection::TypeHandle type_info{type_id};
-    if (type_info.IsA<T>()) {
+    const auto type_guid = component->GetTypeGUID();
+    const cppreflection::Type* type =
+        type_registry->FindType(component->GetTypeGUID());
+    if (type->IsA(cppreflection::GetStaticTypeGUID<T>())) {
       f(*static_cast<T*>(component.get()));
     }
   }
@@ -56,25 +59,25 @@ void Entity::ForEachComp(F&& f) {
 
 template <typename T>
 T& Entity::AddComponent() {
-  const ui32 type_id = reflection::GetTypeId<T>();
-  Component* component_base = AddComponent(type_id);
+  const auto type_guid = cppreflection::GetStaticTypeInfo<T>().guid;
+  Component* component_base = AddComponent(type_guid);
   return *static_cast<T*>(component_base);
 }
 
 template <typename T>
 class SimpleEntityBase : public Entity {
  public:
-  [[nodiscard]] virtual ui32 GetTypeId() const noexcept override {
-    return reflection::GetTypeId<T>();
+  [[nodiscard]] virtual ui32 GetTypeGUID() const noexcept override {
+    return cppreflection::GetStaticTypeInfo<T>().guid;
   }
 };
 
-namespace reflection {
+namespace cppreflection {
 template <>
-struct TypeReflector<Entity> {
-  static void ReflectType(TypeHandle handle) {
-    handle->name = "Entity";
-    handle->guid = "E5CACCEE-51D1-4180-AADB-00AD77469579";
+struct TypeReflectionProvider<Entity> {
+  [[nodiscard]] inline constexpr static auto ReflectType() {
+    return cppreflection::StaticClassTypeInfo<Entity>(
+        "Entity", edt::GUID::Create("E5CACCEE-51D1-4180-AADB-00AD77469579"));
   }
 };
-}  // namespace reflection
+}  // namespace cppreflection

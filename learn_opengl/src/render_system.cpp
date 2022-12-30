@@ -9,7 +9,6 @@
 #include "entities/entity.hpp"
 #include "opengl/debug/annotations.hpp"
 #include "reflection/glm_reflect.hpp"
-#include "reflection/predefined.hpp"
 #include "spdlog/spdlog.h"
 #include "texture/texture_manager.hpp"
 #include "window.hpp"

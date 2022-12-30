@@ -2,11 +2,10 @@
 
 #include <stdexcept>
 
+#include "CppReflection/GetStaticTypeInfo.hpp"
+#include "EverydayTools/GUID_fmtlib.hpp"
 #include "components/type_id_widget.hpp"
-#include "fmt/format.h"
 #include "reflection/glm_reflect.hpp"
-#include "reflection/predefined.hpp"
-#include "reflection/reflection.hpp"
 
 ShaderDefine::ShaderDefine(ShaderDefine&& another) { MoveFrom(another); }
 
@@ -23,11 +22,11 @@ inline static const T& CastBuffer(const std::vector<ui8>& buffer) noexcept {
 
 std::string ShaderDefine::GenDefine() const {
   std::string value_str;
-  if (type_id == reflection::GetTypeId<int>()) {
+  if (type_guid == cppreflection::GetStaticTypeGUID<int>()) {
     value_str = fmt::format("{}", CastBuffer<int>(value));
-  } else if (type_id == reflection::GetTypeId<float>()) {
+  } else if (type_guid == cppreflection::GetStaticTypeGUID<float>()) {
     value_str = fmt::format("{}", CastBuffer<float>(value));
-  } else if (type_id == reflection::GetTypeId<glm::vec3>()) {
+  } else if (type_guid == cppreflection::GetStaticTypeGUID<glm::vec3>()) {
     const auto& vec = CastBuffer<glm::vec3>(value);
     value_str = fmt::format("vec3({}, {}, {})", vec.x, vec.y, vec.z);
   }
@@ -37,14 +36,14 @@ std::string ShaderDefine::GenDefine() const {
 
 void ShaderDefine::MoveFrom(ShaderDefine& another) {
   name = std::move(another.name);
-  type_id = another.type_id;
+  type_guid = another.type_guid;
   value = std::move(another.value);
 }
 
 void ShaderDefine::SetValue(std::span<const ui8> value_view) {
-  auto ti = reflection::GetTypeInfo(type_id);
-  if (!ti) {
-    throw std::runtime_error(fmt::format("Unknown type id {}", type_id));
+  auto type_registry = cppreflection::GetTypeRegistry();
+  if (!type_registry->FindType(type_guid)) {
+    throw std::runtime_error(fmt::format("Unknown type guid {}", type_guid));
   }
 
   value.resize(value_view.size());
@@ -63,22 +62,22 @@ ShaderDefine ShaderDefine::ReadFromJson(const nlohmann::json& json) {
   auto& default_value_json = json.at("default");
   std::string type_name = json.at("type");
   if (type_name == "float") {
-    def.type_id = reflection::GetTypeId<float>();
+    def.type_guid = cppreflection::GetStaticTypeGUID<float>();
     const float v = default_value_json;
     def.SetValue(MakeValueSpan(v));
   } else if (type_name == "int") {
-    def.type_id = reflection::GetTypeId<int>();
+    def.type_guid = cppreflection::GetStaticTypeGUID<int>();
     int v = default_value_json;
     def.SetValue(MakeValueSpan(v));
   } else if (type_name == "vec3") {
-    def.type_id = reflection::GetTypeId<glm::vec3>();
+    def.type_guid = cppreflection::GetStaticTypeGUID<glm::vec3>();
     glm::vec3 v;
     v.x = default_value_json["x"];
     v.y = default_value_json["y"];
     v.z = default_value_json["z"];
     def.SetValue(MakeValueSpan(v));
   } else if (type_name == "vec2") {
-    def.type_id = reflection::GetTypeId<glm::vec2>();
+    def.type_guid = cppreflection::GetStaticTypeGUID<glm::vec2>();
     glm::vec2 v;
     v.x = default_value_json["x"];
     v.y = default_value_json["y"];

@@ -7,9 +7,9 @@
 #include <string_view>
 #include <vector>
 
+#include "CppReflection/GetStaticTypeInfo.hpp"
 #include "integer.hpp"
 #include "opengl/gl_api.hpp"
-#include "reflection/reflection.hpp"
 #include "shader/define_handle.hpp"
 #include "shader/uniform_handle.hpp"
 
@@ -32,7 +32,7 @@ class Shader {
 
   std::optional<UniformHandle> FindUniform(Name name) const noexcept;
   UniformHandle GetUniform(Name name) const;
-  void SetUniform(UniformHandle& handle, ui32 type_id,
+  void SetUniform(UniformHandle& handle, edt::GUID type_guid,
                   std::span<const ui8> data);
 
   void SetUniform(UniformHandle& handle,
@@ -41,7 +41,7 @@ class Shader {
   template <typename T>
   void SetUniform(UniformHandle& handle, const T& value) {
     SetUniform(
-        handle, reflection::GetTypeId<T>(),
+        handle, cppreflection::GetStaticTypeInfo<T>().guid,
         std::span<const ui8>(reinterpret_cast<const ui8*>(&value), sizeof(T)));
   }
 
@@ -50,17 +50,18 @@ class Shader {
 
   template <typename T>
   const T& GetDefineValue(DefineHandle& handle) const;
-  std::span<const ui8> GetDefineValue(DefineHandle& handle, ui32 type_id) const;
+  std::span<const ui8> GetDefineValue(DefineHandle& handle,
+                                      edt::GUID type_guid) const;
   std::optional<DefineHandle> FindDefine(Name name) const noexcept;
   DefineHandle GetDefine(Name name) const;
 
-  void SetDefineValue(DefineHandle& handle, ui32 type,
+  void SetDefineValue(DefineHandle& handle, edt::GUID type_guid,
                       std::span<const ui8> value);
 
   template <typename T>
   void SetDefineValue(DefineHandle& handle, const T& value) {
     SetDefineValue(
-        handle, reflection::GetTypeId<T>(),
+        handle, cppreflection::GetStaticTypeInfo<T>().guid,
         std::span<const ui8>(reinterpret_cast<const ui8*>(&value), sizeof(T)));
   }
 
@@ -68,14 +69,14 @@ class Shader {
   ShaderUniform& GetUniform(UniformHandle& handle);
   const ShaderUniform& GetUniform(UniformHandle& handle) const;
   std::span<const ui8> GetUniformValueViewRaw(UniformHandle& handle,
-                                              ui32 type_id) const;
+                                              edt::GUID type_guid) const;
   void UpdateUniformHandle(UniformHandle& handle) const;
   void UpdateDefineHandle(DefineHandle& handle) const;
 
   template <typename T>
   const T& GetUniformValue(UniformHandle& handle) {
-    std::span<const ui8> view =
-        GetUniformValueViewRaw(handle, reflection::GetTypeId<T>());
+    std::span<const ui8> view = GetUniformValueViewRaw(
+        handle, cppreflection::GetStaticTypeInfo<T>().guid);
     assert(view.size() == sizeof(T));
     return *reinterpret_cast<const T*>(view.data());
   }
@@ -99,7 +100,7 @@ class Shader {
 
 template <typename T>
 const T& Shader::GetDefineValue(DefineHandle& handle) const {
-  const ui32 type_id = reflection::GetTypeId<T>();
-  auto value_view = GetDefineValue(handle, type_id);
+  constexpr edt::GUID type_guid = cppreflection::GetStaticTypeInfo<T>().guid;
+  auto value_view = GetDefineValue(handle, type_guid);
   return *reinterpret_cast<const T*>(value_view.data());
 }

@@ -3,7 +3,6 @@
 #include <algorithm>
 
 #include "reflection/glm_reflect.hpp"
-#include "reflection/predefined.hpp"
 
 [[nodiscard]] glm::mat4 CameraComponent::GetProjection(
     float aspect) const noexcept {
@@ -23,17 +22,3 @@ void CameraComponent::AddInput(glm::vec3 YawPitchRoll) {
   front.z = std::sin(r.y);
   front = glm::normalize(front);
 }
-
-namespace reflection {
-void TypeReflector<CameraComponent>::ReflectType(TypeHandle handle) {
-  handle->name = "CameraComponent";
-  handle->guid = "8E4717C2-65B2-41C8-AAA6-91285A671314";
-  handle.SetBaseClass<Component>();
-  handle.Add<&CameraComponent::speed>("speed");
-  handle.Add<&CameraComponent::near_plane>("near_plane");
-  handle.Add<&CameraComponent::far_plane>("far_plane");
-  handle.Add<&CameraComponent::eye>("eye");
-  handle.Add<&CameraComponent::front>("front");
-  handle.Add<&CameraComponent::up>("up");
-}
-}  // namespace reflection

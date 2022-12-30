@@ -1,42 +1,49 @@
 #pragma once
 
-#include "reflection/reflection.hpp"
+#include "CppReflection/ReflectionProvider.hpp"
+#include "CppReflection/StaticType/class.hpp"
 #include "wrap/wrap_glm.hpp"
 
-namespace reflection {
+namespace cppreflection {
+
 template <>
-struct TypeReflector<glm::vec4> {
-  static void ReflectType(TypeHandle handle) {
-    handle->name = "glm::vec4";
-    handle->guid = "1D2F4DA1-5416-4087-8543-820902BBACB2";
+struct TypeReflectionProvider<glm::vec4> {
+  [[nodiscard]] inline constexpr static auto ReflectType() {
+    return cppreflection::StaticClassTypeInfo<glm::vec4>(
+        "glm::vec4", edt::GUID::Create("1D2F4DA1-5416-4087-8543-820902BBACB2"));
   }
 };
+
 template <>
-struct TypeReflector<glm::vec3> {
-  static void ReflectType(TypeHandle handle) {
-    handle->name = "glm::vec3";
-    handle->guid = "7AEE11B0-DCCB-4AFC-AD00-5B8EA4A0E015";
+struct TypeReflectionProvider<glm::vec3> {
+  [[nodiscard]] inline constexpr static auto ReflectType() {
+    return cppreflection::StaticClassTypeInfo<glm::vec3>(
+        "glm::vec3", edt::GUID::Create("7AEE11B0-DCCB-4AFC-AD00-5B8EA4A0E015"));
   }
 };
+
 template <>
-struct TypeReflector<glm::vec2> {
-  static void ReflectType(TypeHandle handle) {
-    handle->name = "glm::vec2";
-    handle->guid = "B01CA829-0E80-4CD9-95E9-D7F32266F093";
+struct TypeReflectionProvider<glm::vec2> {
+  [[nodiscard]] inline constexpr static auto ReflectType() {
+    return cppreflection::StaticClassTypeInfo<glm::vec2>(
+        "glm::vec2", edt::GUID::Create("B01CA829-0E80-4CD9-95E9-D7F32266F093"));
   }
 };
+
 template <>
-struct TypeReflector<glm::mat4> {
-  static void ReflectType(TypeHandle handle) {
-    handle->name = "glm::mat4";
-    handle->guid = "9B24C2C7-29CD-45F6-AC74-880866D492D0";
+struct TypeReflectionProvider<glm::mat4> {
+  [[nodiscard]] inline constexpr static auto ReflectType() {
+    return cppreflection::StaticClassTypeInfo<glm::mat4>(
+        "glm::mat4", edt::GUID::Create("9B24C2C7-29CD-45F6-AC74-880866D492D0"));
   }
 };
+
 template <>
-struct TypeReflector<glm::mat3> {
-  static void ReflectType(TypeHandle handle) {
-    handle->name = "glm::mat3";
-    handle->guid = "2D13324E-08A3-47AD-8AC8-9E861EF9F104";
+struct TypeReflectionProvider<glm::mat3> {
+  [[nodiscard]] inline constexpr static auto ReflectType() {
+    return cppreflection::StaticClassTypeInfo<glm::mat3>(
+        "glm::mat3", edt::GUID::Create("2D13324E-08A3-47AD-8AC8-9E861EF9F104"));
   }
 };
-}  // namespace reflection
+
+}  // namespace cppreflection
