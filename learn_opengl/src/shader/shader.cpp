@@ -224,8 +224,8 @@ void Shader::DrawDetails() {
       auto type_info =
           cppreflection::GetTypeRegistry()->FindType(uniform.GetTypeGUID());
 
-      type_info->GetSpecialMembers().copyAssign((void*)stack_val_arr,
-                                                uniform.GetValue().data());
+      type_info->GetSpecialMembers().copyConstructor((void*)stack_val_arr,
+                                                     uniform.GetValue().data());
       assert(stack_val_bytes >= type_info->GetInstanceSize());
 
       std::span<ui8> val_view(reinterpret_cast<ui8*>(stack_val_arr),

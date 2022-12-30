@@ -22,7 +22,8 @@ static auto get_texture_json(std::string_view path) {
 Texture::Texture() = default;
 Texture::~Texture() = default;
 
-static void JsonParseOpt(nlohmann::json& json, const char* key, auto&& fn) {
+static void JsonParseOpt(nlohmann::json& json, std::string_view key,
+                         auto&& fn) {
   if (json.contains(key)) {
     auto& key_json = json[key];
     fn(key_json);
@@ -31,9 +32,9 @@ static void JsonParseOpt(nlohmann::json& json, const char* key, auto&& fn) {
 
 template <GlTextureWrap wrap>
 static void ParseAndApplyWrapMode(auto& wrap_json) {
-  constexpr auto wrap_str = OpenGl::ToString(wrap);
-  JsonParseOpt(wrap_json, wrap_str.data(), [&](std::string value_str) {
-    const GlTextureWrapMode value = OpenGl::Parse<GlTextureWrapMode>(value_str);
+  constexpr auto wrap_str = cppreflection::EnumToString(wrap);
+  JsonParseOpt(wrap_json, wrap_str, [&](std::string_view value_str) {
+    const auto value = cppreflection::ParseEnum<GlTextureWrapMode>(value_str);
     OpenGl::SetTexture2dWrap(wrap, value);
   });
 }
@@ -69,10 +70,12 @@ std::shared_ptr<Texture> Texture::LoadFrom(
 
   JsonParseOpt(texture_json, "filter", [&](auto& filter_json) {
     JsonParseOpt(filter_json, "min", [&](std::string value_str) {
-      OpenGl::SetTexture2dMinFilter(OpenGl::Parse<GlTextureFilter>(value_str));
+      OpenGl::SetTexture2dMinFilter(
+          cppreflection::ParseEnum<GlTextureFilter>(value_str));
     });
     JsonParseOpt(filter_json, "mag", [&](std::string value_str) {
-      OpenGl::SetTexture2dMagFilter(OpenGl::Parse<GlTextureFilter>(value_str));
+      OpenGl::SetTexture2dMagFilter(
+          cppreflection::ParseEnum<GlTextureFilter>(value_str));
     });
   });
 
