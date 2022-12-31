@@ -1,5 +1,6 @@
 #include "memory/memory.hpp"
 
+#include <cassert>
 #include <cstdlib>
 
 /* C11 - The Universal CRT implemented the parts of the C11 Standard Library
@@ -16,7 +17,9 @@ void* Memory::AlignedAlloc(size_t size, [[maybe_unused]] size_t alignment) {
   return _aligned_malloc(size, alignment);
 #else
   // compiles but fires an exception...
-  return std::aligned_alloc(size, alignment);
+  void* pointer = std::malloc(size);
+  assert((reinterpret_cast<size_t>(pointer) % alignment) == 0);
+  return pointer;
 #endif
 }
 

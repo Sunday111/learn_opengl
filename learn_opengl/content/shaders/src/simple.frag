@@ -47,6 +47,15 @@ struct LightResult
     vec3 specular;
 };
 
+LightResult light_result_create()
+{
+    LightResult r;
+    r.ambient = vec3(0);
+    r.diffuse = vec3(0);
+    r.specular = vec3(0);
+    return r;
+}
+
 struct CachedValues
 {
     vec3 normal;
@@ -131,7 +140,7 @@ void AppendLightResult(inout LightResult a, in LightResult b)
 
 LightResult ComputePointLights(in CachedValues cache)
 {
-    LightResult r;
+    LightResult r = light_result_create();
     for(int i = 0; i < cv_num_point_lights; ++i) {
         AppendLightResult(r, ApplyPointLight(pointLights[i], cache));
     }
@@ -145,7 +154,7 @@ LightResult ComputePointLights(in CachedValues cache)
 
 LightResult ComputeDirectionalLights(in CachedValues cache)
 {
-    LightResult r;
+    LightResult r = light_result_create();
     for(int i = 0; i < cv_num_directional_lights; ++i) {
         AppendLightResult(r, ApplyDirectionalLight(directionalLights[i], cache));
     }
@@ -159,7 +168,7 @@ LightResult ComputeDirectionalLights(in CachedValues cache)
 
 LightResult ComputeSpotLights(in CachedValues cache)
 {
-    LightResult r;
+    LightResult r = light_result_create();
     for(int i = 0; i < cv_num_spot_lights; ++i) {
         AppendLightResult(r, ApplySpotLight(spotLights[i], cache));
     }
@@ -179,7 +188,7 @@ void main()
     cache.materialDiffuse = vec3(materialDiffuse);
     cache.materialSpecular = vec3(texture(material.specular, fragmentTextureCoordinates));
 
-    LightResult lightsResult;
+    LightResult lightsResult = light_result_create();
     AppendLightResult(lightsResult, ComputePointLights(cache));
     AppendLightResult(lightsResult, ComputeDirectionalLights(cache));
     AppendLightResult(lightsResult, ComputeSpotLights(cache));
