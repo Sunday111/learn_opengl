@@ -77,7 +77,7 @@ void Window::MouseScrollCallback(GLFWwindow* glfw_window, double x_offset,
 void Window::Create() {
   window_ =
       glfwCreateWindow(static_cast<int>(width_), static_cast<int>(height_),
-                       "LearnOpenGL", NULL, NULL);
+                       "LearnOpenGL", nullptr, nullptr);
 
   if (!window_) {
     throw std::runtime_error(fmt::format("Failed to create window"));

@@ -33,15 +33,11 @@ static void JsonParseOpt(nlohmann::json& json, std::string_view key,
 template <GlTextureWrap wrap>
 static void ParseAndApplyWrapMode(auto& wrap_json) {
   constexpr auto wrap_str = cppreflection::EnumToString(wrap);
-  JsonParseOpt(wrap_json, wrap_str, [&](std::string_view value_str) {
+  JsonParseOpt(wrap_json, wrap_str, [&](std::string value_str) {
     const auto value = cppreflection::ParseEnum<GlTextureWrapMode>(value_str);
     OpenGl::SetTexture2dWrap(wrap, value);
   });
 }
-
-static void ParseAndApplyMinFilter(auto& filter_json) {}
-
-static void ParseAndApplyMagFilter(auto& filter_json) {}
 
 std::shared_ptr<Texture> Texture::LoadFrom(
     std::string_view json_path, const std::filesystem::path& src_dir) {

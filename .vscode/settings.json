@@ -1,5 +1,9 @@
 {
-    "clang-format.executable": "C:/Program Files/LLVM/bin/clang-format.exe",
+    "clang-format.executable": "clang-format",
+    "cmake.environment": {
+        "CC": "/home/sunday/llvm-project/build/bin/clang",
+        "CXX": "/home/sunday/llvm-project/build/bin/clang++"
+    },
     "cfiles.exclude": {
         "**/.git": false
     },
@@ -104,6 +108,9 @@
         "queue": "cpp",
         "stack": "cpp",
         "numbers": "cpp",
-        "semaphore": "cpp"
+        "semaphore": "cpp",
+        "strstream": "cpp",
+        "cfenv": "cpp",
+        "*.ipp": "cpp"
     }
 }

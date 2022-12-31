@@ -71,7 +71,7 @@ static void CompileShader(GLuint shader, const std::filesystem::path& path,
     std::string error_info;
     if (info_length > 0) {
       error_info.resize(static_cast<size_t>(info_length));
-      glGetShaderInfoLog(shader, info_length, NULL, error_info.data());
+      glGetShaderInfoLog(shader, info_length, nullptr, error_info.data());
     }
     throw std::runtime_error(fmt::format("failed to compile shader {} log:\n{}",
                                          path.stem().string(), error_info));
@@ -95,7 +95,7 @@ static GLuint LinkShaders(const std::span<const GLuint>& shaders) {
   std::string error_info;
   if (info_length > 0) {
     error_info.resize(static_cast<size_t>(info_length));
-    glGetShaderInfoLog(program, info_length, NULL, error_info.data());
+    glGetShaderInfoLog(program, info_length, nullptr, error_info.data());
   }
   glDeleteProgram(program);
   throw std::runtime_error(
@@ -224,8 +224,8 @@ void Shader::DrawDetails() {
       auto type_info =
           cppreflection::GetTypeRegistry()->FindType(uniform.GetTypeGUID());
 
-      type_info->GetSpecialMembers().copyConstructor((void*)stack_val_arr,
-                                                     uniform.GetValue().data());
+      type_info->GetSpecialMembers().copyConstructor(
+          reinterpret_cast<void*>(stack_val_arr), uniform.GetValue().data());
       assert(stack_val_bytes >= type_info->GetInstanceSize());
 
       std::span<ui8> val_view(reinterpret_cast<ui8*>(stack_val_arr),
@@ -262,7 +262,7 @@ std::span<const ui8> Shader::GetDefineValue(DefineHandle& handle,
         type_registry->FindType(type_guid)->GetName()));
   }
 
-  return define.value;
+  return std::span(define.value.begin(), define.value.size());
 }
 
 void Shader::SetDefineValue(DefineHandle& handle, edt::GUID type_guid,
@@ -430,9 +430,14 @@ static std::optional<edt::GUID> ConvertGlType(GLenum gl_type) {
 }
 
 void Shader::UpdateUniforms() {
-  GLint num_uniforms;
-  glGetProgramiv(*program_, GL_ACTIVE_UNIFORMS, &num_uniforms);
-  [[unlikely]] if (num_uniforms < 1) { return; }
+  GLuint num_uniforms;
+
+  {
+    GLint num_uniforms_;
+    glGetProgramiv(*program_, GL_ACTIVE_UNIFORMS, &num_uniforms_);
+    [[unlikely]] if (num_uniforms_ < 1) { return; }
+    num_uniforms = static_cast<GLuint>(num_uniforms_);
+  }
 
   GLint max_name_legth;
   glGetProgramiv(*program_, GL_ACTIVE_UNIFORM_MAX_LENGTH, &max_name_legth);
@@ -455,7 +460,7 @@ void Shader::UpdateUniforms() {
 
   std::vector<ShaderUniform> uniforms;
   uniforms.reserve(num_uniforms);
-  for (GLint i = 0; i < num_uniforms; ++i) {
+  for (GLuint i = 0; i != num_uniforms; ++i) {
     GLint variable_size;
     GLenum glsl_type;
     GLsizei actual_name_length;
@@ -493,7 +498,7 @@ void Shader::UpdateUniforms() {
 
     const GLint location =
         glGetUniformLocation(*program_, variable_name.GetView().data());
-    uniforms.back().SetLocation(location);
+    uniforms.back().SetLocation(static_cast<ui32>(location));
   }
 
   std::swap(uniforms, uniforms_);

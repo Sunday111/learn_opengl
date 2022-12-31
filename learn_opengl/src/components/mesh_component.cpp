@@ -55,9 +55,9 @@ static void LoadModel(const std::string& model_path,
         const size_t normal_offset =
             static_cast<size_t>(3 * model_index.normal_index);
 
-        for (int i = 0; i < 3; ++i) {
-          v.position[i] = attrib.vertices[vertex_offset + i];
-          v.normal[i] = attrib.normals[normal_offset + i];
+        for (size_t i = 0; i != 3; ++i) {
+          v.position[static_cast<int>(i)] = attrib.vertices[vertex_offset + i];
+          v.normal[static_cast<int>(i)] = attrib.normals[normal_offset + i];
         }
 
         const size_t texcoord_offset =

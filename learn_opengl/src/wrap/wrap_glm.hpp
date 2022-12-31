@@ -8,6 +8,7 @@
         warning_push \
         _Pragma("GCC diagnostic ignored \"-Wsign-conversion\"") \
         _Pragma("GCC diagnostic ignored \"-Wconversion\"") \
+        _Pragma("GCC diagnostic ignored \"-Wfloat-equal\"") \
         static_assert(true, "")
 #elif defined(__GNUC__) || defined(__GNUG__)
     #define include_glm_begin \

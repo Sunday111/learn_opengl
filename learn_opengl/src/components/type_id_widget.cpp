@@ -14,11 +14,6 @@ bool ScalarProperty(edt::GUID type_guid, std::string_view name, void* address,
                     T max = std::numeric_limits<T>::max()) {
   constexpr auto type_info = cppreflection::GetStaticTypeInfo<T>();
   if (type_info.guid == type_guid) {
-    const char* format = "%.3f";
-    if constexpr (std::is_floating_point_v<T>) {
-      format = "%d";
-    }
-
     T* value = reinterpret_cast<T*>(address);
     const bool c = ImGui::DragScalar(name.data(), CastDataType<T>(), value,
                                      1.0f, &min, &max);

@@ -6,9 +6,8 @@
 
 #include "CppReflection/GetStaticTypeInfo.hpp"
 #include "EverydayTools/GUID.hpp"
+#include "components/component.hpp"
 #include "integer.hpp"
-
-class Component;
 
 class Entity {
  public:
@@ -26,6 +25,7 @@ class Entity {
 
   template <typename T = Component, typename F>
   void ForEachComp(F&& f);
+
   template <typename T>
   T& AddComponent();
   [[nodiscard]] virtual edt::GUID GetTypeGUID() const noexcept;
@@ -47,11 +47,11 @@ class Entity {
 template <typename T, typename F>
 void Entity::ForEachComp(F&& f) {
   cppreflection::TypeRegistry* type_registry = cppreflection::GetTypeRegistry();
+  constexpr edt::GUID filter_guid = cppreflection::GetStaticTypeGUID<T>();
   for (auto& component : components_) {
     const auto type_guid = component->GetTypeGUID();
-    const cppreflection::Type* type =
-        type_registry->FindType(component->GetTypeGUID());
-    if (type->IsA(cppreflection::GetStaticTypeGUID<T>())) {
+    const cppreflection::Type* type = type_registry->FindType(type_guid);
+    if (type->IsA(filter_guid)) {
       f(*static_cast<T*>(component.get()));
     }
   }
@@ -67,7 +67,7 @@ T& Entity::AddComponent() {
 template <typename T>
 class SimpleEntityBase : public Entity {
  public:
-  [[nodiscard]] virtual ui32 GetTypeGUID() const noexcept override {
+  [[nodiscard]] virtual edt::GUID GetTypeGUID() const noexcept override {
     return cppreflection::GetStaticTypeInfo<T>().guid;
   }
 };

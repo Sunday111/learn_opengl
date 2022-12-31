@@ -112,8 +112,14 @@ void CreateMeshes(World& world, const std::shared_ptr<Shader>& shader) {
       mesh.MakeCube(1.0f, cube_color, shader);  //
       auto& t = entity.AddComponent<TransformComponent>();
 
-      auto position = glm::vec3((x * width / nx) - (width / 2),
-                                (y * height / ny) - (height / 2), 0.0f);
+      const float px =
+          (static_cast<float>(x) * width / static_cast<float>(nx)) -
+          (width / 2);
+      const float py =
+          (static_cast<float>(y) * height / static_cast<float>(ny)) -
+          (height / 2);
+      const float pz = 0.0f;
+      auto position = glm::vec3(px, py, pz);
       t.transform = glm::translate(t.transform, position);
     }
   }
@@ -141,7 +147,8 @@ void CreatePointLights(World& world, RenderSystem& render_system) {
     mesh.MakeCube(0.2f, light_color, render_system.shader_);
     TransformComponent& transform = entity.AddComponent<TransformComponent>();
 
-    float angle = (360.0f * light_index) / num_lights;
+    float angle = (360.0f * static_cast<float>(light_index)) /
+                  static_cast<float>(num_lights);
     float y = glm::sin(glm::radians(angle));
     float x = glm::cos(glm::radians(angle));
 
@@ -181,8 +188,10 @@ void Main([[maybe_unused]] int argc, char** argv) {
     if (GLFWmonitor* monitor = glfwGetPrimaryMonitor()) {
       float x_scale, y_scale;
       glfwGetMonitorContentScale(monitor, &x_scale, &y_scale);
-      window_width = static_cast<ui32>(window_width * x_scale);
-      window_height = static_cast<ui32>(window_height * y_scale);
+      window_width =
+          static_cast<ui32>(static_cast<float>(window_width) * x_scale);
+      window_height =
+          static_cast<ui32>(static_cast<float>(window_height) * y_scale);
     }
 
     windows.push_back(std::make_unique<Window>(window_width, window_height));

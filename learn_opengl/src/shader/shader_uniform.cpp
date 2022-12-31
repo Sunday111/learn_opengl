@@ -10,7 +10,6 @@
 #include "sampler_uniform.hpp"
 #include "spdlog/spdlog.h"
 
-
 template <typename T>
 struct ValueTypeHelper {
   static bool Exec(edt::GUID type_guid, ui32 location,
@@ -35,7 +34,8 @@ struct ValueTypeHelper<SamplerUniform> {
       static_assert(GL_TEXTURE31 - GL_TEXTURE0 == 31);
       glActiveTexture(static_cast<GLenum>(GL_TEXTURE0 + v.sampler_index));
       glBindTexture(GL_TEXTURE_2D, texture_handle);
-      glUniform1i(location, v.sampler_index);
+      glUniform1i(static_cast<GLint>(location),
+                  static_cast<GLint>(v.sampler_index));
 
       return true;
     }

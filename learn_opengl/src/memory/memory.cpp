@@ -11,10 +11,11 @@
  * aligned allocations.
  */
 
-void* Memory::AlignedAlloc(size_t size, size_t alignment) {
+void* Memory::AlignedAlloc(size_t size, [[maybe_unused]] size_t alignment) {
 #ifdef _MSC_VER
   return _aligned_malloc(size, alignment);
 #else
+  // compiles but fires an exception...
   return std::aligned_alloc(size, alignment);
 #endif
 }
