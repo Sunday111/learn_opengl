@@ -4,7 +4,7 @@
 
 #include "fmt/format.h"
 
-#ifdef _MSC_VER
+#if !defined(_MSC_VER) && !defined(__clang__)
 #include "stb/stb_image.h"
 #else
 #pragma GCC diagnostic push

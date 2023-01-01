@@ -9,6 +9,8 @@
         _Pragma("GCC diagnostic ignored \"-Wsign-conversion\"") \
         _Pragma("GCC diagnostic ignored \"-Wconversion\"") \
         _Pragma("GCC diagnostic ignored \"-Wfloat-equal\"") \
+        _Pragma("GCC diagnostic ignored \"-Wgnu-anonymous-struct\"") \
+        _Pragma("GCC diagnostic ignored \"-Wnested-anon-types\"") \
         static_assert(true, "")
 #elif defined(__GNUC__) || defined(__GNUG__)
     #define include_glm_begin \

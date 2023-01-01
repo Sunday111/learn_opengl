@@ -1,9 +1,10 @@
 {
     "clang-format.executable": "clang-format",
-    "cmake.environment": {
-        "CC": "/home/sunday/llvm-project/build/bin/clang",
-        "CXX": "/home/sunday/llvm-project/build/bin/clang++"
-    },
+    //"cmake.environment": {
+    //    "CC": "C:/Data/projects/llvm-project/build/bin/clang",
+    //    "CXX": "C:/Data/projects/llvm-project/build/bin/clang++",
+    //    "RC": "C:/Data/projects/llvm-project/build/bin/clang"
+    //},
     "cfiles.exclude": {
         "**/.git": false
     },

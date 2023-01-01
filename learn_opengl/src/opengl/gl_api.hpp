@@ -1,6 +1,13 @@
 #pragma once
 
+#if defined(_MSC_VER) && !defined(__clang__)
 #include <glad/glad.h>
+#else
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wlanguage-extension-token"
+#include <glad/glad.h>
+#pragma GCC diagnostic pop
+#endif
 
 #include <array>
 #include <bit>
