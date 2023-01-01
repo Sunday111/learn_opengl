@@ -1,5 +1,5 @@
 {
-    "clang-format.executable": "clang-format",
+    // Use clang built from source (Windows)
     //"cmake.environment": {
     //    "CC": "C:/Data/projects/llvm-project/build/bin/clang",
     //    "CXX": "C:/Data/projects/llvm-project/build/bin/clang++",
