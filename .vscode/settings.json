@@ -1,4 +1,9 @@
 {
+    // Use llbvm built from sources (linux)
+    "cmake.environment": {
+        "CC": "/home/sunday/llvm-project/build/bin/clang",
+        "CXX": "/home/sunday/llvm-project/build/bin/clang++"
+    },
     // Use clang built from source (Windows)
     //"cmake.environment": {
     //    "CC": "C:/Data/projects/llvm-project/build/bin/clang",

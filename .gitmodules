@@ -34,3 +34,6 @@
 [submodule "dep/google/googletest"]
 	path = dep/google/googletest
 	url = https://github.com/google/googletest
+[submodule "dep/eigen"]
+	path = dep/eigen
+	url = https://gitlab.com/libeigen/eigen.git
