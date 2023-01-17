@@ -13,7 +13,7 @@
 #include "components/type_id_widget.hpp"
 #include "nlohmann/json.hpp"
 #include "read_file.hpp"
-#include "reflection/glm_reflect.hpp"
+#include "reflection/eigen_reflect.hpp"
 #include "shader/sampler_uniform.hpp"
 #include "shader/shader.hpp"
 #include "shader/shader_define.hpp"
@@ -402,23 +402,23 @@ static std::optional<edt::GUID> ConvertGlType(GLenum gl_type) {
       break;
 
     case GL_FLOAT_VEC2:
-      return cppreflection::GetStaticTypeInfo<glm::vec2>().guid;
+      return cppreflection::GetStaticTypeInfo<Eigen::Vector2f>().guid;
       break;
 
     case GL_FLOAT_VEC3:
-      return cppreflection::GetStaticTypeInfo<glm::vec3>().guid;
+      return cppreflection::GetStaticTypeInfo<Eigen::Vector3f>().guid;
       break;
 
     case GL_FLOAT_VEC4:
-      return cppreflection::GetStaticTypeInfo<glm::vec4>().guid;
+      return cppreflection::GetStaticTypeInfo<Eigen::Vector4f>().guid;
       break;
 
     case GL_FLOAT_MAT3:
-      return cppreflection::GetStaticTypeInfo<glm::mat3>().guid;
+      return cppreflection::GetStaticTypeInfo<Eigen::Matrix3f>().guid;
       break;
 
     case GL_FLOAT_MAT4:
-      return cppreflection::GetStaticTypeInfo<glm::mat4>().guid;
+      return cppreflection::GetStaticTypeInfo<Eigen::Matrix4f>().guid;
       break;
 
     case GL_SAMPLER_2D:

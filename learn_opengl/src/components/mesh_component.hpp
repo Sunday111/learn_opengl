@@ -5,16 +5,16 @@
 
 #include "components/component.hpp"
 #include "opengl/gl_api.hpp"
-#include "reflection/glm_reflect.hpp"
+#include "reflection/eigen_reflect.hpp"
 
 class Shader;
 
 class Vertex {
  public:
-  glm::vec3 position;
-  glm::vec2 tex_coord;
-  glm::vec3 color;
-  glm::vec3 normal;
+  Eigen::Vector3f position;
+  Eigen::Vector2f tex_coord;
+  Eigen::Vector3f color;
+  Eigen::Vector3f normal;
 };
 
 class MeshComponent : public SimpleComponentBase<MeshComponent> {
@@ -28,7 +28,7 @@ class MeshComponent : public SimpleComponentBase<MeshComponent> {
               const std::span<const ui32>& indices,
               const std::shared_ptr<Shader>& shader);
 
-  void MakeCube(float width, const glm::vec3& color,
+  void MakeCube(float width, const Eigen::Vector3f& color,
                 const std::shared_ptr<Shader>& shader);
 
   void Draw();

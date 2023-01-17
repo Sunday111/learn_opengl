@@ -18,6 +18,7 @@ add_executable(${target_name}
 
 set_generic_compile_options(${target_name} PUBLIC)
 target_link_libraries(${target_name}
+	eigen
 	stb
 	glad
 	glfw

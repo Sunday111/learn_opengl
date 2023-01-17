@@ -2,16 +2,16 @@
 
 #include "components/component.hpp"
 #include "components/lights/attenuation.hpp"
-#include "reflection/glm_reflect.hpp"
+#include "reflection/eigen_reflect.hpp"
 
 class PointLightComponent : public SimpleComponentBase<PointLightComponent> {
  public:
   PointLightComponent() = default;
   ~PointLightComponent() = default;
 
-  glm::vec3 ambient = glm::vec3(0.1f, 0.1f, 0.1f);
-  glm::vec3 diffuse = glm::vec3(1.0f, 1.0f, 1.0f);
-  glm::vec3 specular = glm::vec3(1.0f, 1.0f, 1.0f);
+  Eigen::Vector3f ambient = Eigen::Vector3f(0.1f, 0.1f, 0.1f);
+  Eigen::Vector3f diffuse = Eigen::Vector3f(1.0f, 1.0f, 1.0f);
+  Eigen::Vector3f specular = Eigen::Vector3f(1.0f, 1.0f, 1.0f);
   Attenuation attenuation;
 };
 

@@ -8,7 +8,7 @@
 #include "components/transform_component.hpp"
 #include "entities/entity.hpp"
 #include "opengl/debug/annotations.hpp"
-#include "reflection/glm_reflect.hpp"
+#include "reflection/eigen_reflect.hpp"
 #include "spdlog/spdlog.h"
 #include "texture/texture_manager.hpp"
 #include "window.hpp"
@@ -114,8 +114,9 @@ void PrintUniforms(std::span<T, Extent> uniforms) {
 void ApplyUniforms(PointLightUniform& u, Shader& s,
                    TransformComponent& transform, PointLightComponent& light) {
   {
-    auto l = transform.transform[3];
-    s.SetUniform(u.location, glm::vec3(l));
+    Eigen::Transform<float, 3, Eigen::Affine> tr(transform.transform);
+    Eigen::Vector3f l = tr.translation();
+    s.SetUniform(u.location, l);
   }
 
   s.SetUniform(u.ambient, light.ambient);
@@ -129,10 +130,11 @@ void ApplyUniforms(PointLightUniform& u, Shader& s,
 void ApplyUniforms(SpotLightUniform& u, Shader& s,
                    TransformComponent& transform, SpotLightComponent& light) {
   {
-    auto& tr = transform.transform;
-    glm::vec3 dir(0.0f, 0.0f, -1.0f);
-    s.SetUniform(u.location, glm::vec3(tr[3]));
-    s.SetUniform(u.direction, dir * glm::mat3(tr));
+    Eigen::Vector3f dir(0.0f, 0.0f, -1.0f);
+    s.SetUniform(u.location, transform.GetTranslation());
+    Eigen::Vector3f direction_mtx =
+        (dir.transpose() * transform.GetRotationMtx()).transpose();
+    s.SetUniform(u.direction, direction_mtx);
   }
 
   s.SetUniform(u.diffuse, light.diffuse);
@@ -148,9 +150,8 @@ void ApplyUniforms(DirectionalLightUniform& u, Shader& s,
                    TransformComponent& transform,
                    DirectionalLightComponent& light) {
   {
-    auto& tr = transform.transform;
-    glm::vec3 dir(1.0f, 0.0f, 0.0f);
-    dir = dir * glm::mat3(tr);
+    Eigen::Vector3f dir(1.0f, 0.0f, 0.0f);
+    dir = (dir.transpose() * transform.GetRotationMtx()).transpose();
     s.SetUniform(u.direction, dir);
   }
 
@@ -210,14 +211,14 @@ RenderSystem::RenderSystem(TextureManager& texture_manager)
   container_specular_ =
       texture_manager.GetTexture("container_specular.texture.json");
 
-  default_point_light_.ambient = glm::vec3(0.0f);
-  default_point_light_.diffuse = glm::vec3(0.0f);
-  default_point_light_.specular = glm::vec3(0.0f);
-  default_directional_light_.ambient = glm::vec3(0.0f);
-  default_directional_light_.diffuse = glm::vec3(0.0f);
-  default_directional_light_.specular = glm::vec3(0.0f);
-  default_spot_light_.diffuse = glm::vec3(0.0f);
-  default_spot_light_.specular = glm::vec3(0.0f);
+  default_point_light_.ambient = Eigen::Vector3f::Zero();
+  default_point_light_.diffuse = Eigen::Vector3f::Zero();
+  default_point_light_.specular = Eigen::Vector3f::Zero();
+  default_directional_light_.ambient = Eigen::Vector3f::Zero();
+  default_directional_light_.diffuse = Eigen::Vector3f::Zero();
+  default_directional_light_.specular = Eigen::Vector3f::Zero();
+  default_spot_light_.diffuse = Eigen::Vector3f::Zero();
+  default_spot_light_.specular = Eigen::Vector3f::Zero();
   def_num_point_lights_ = shader_->GetDefine("cv_num_point_lights");
   def_num_directional_lights_ = shader_->GetDefine("cv_num_directional_lights");
   def_num_spot_lights_ = shader_->GetDefine("cv_num_spot_lights");
@@ -237,7 +238,7 @@ RenderSystem::RenderSystem(TextureManager& texture_manager)
   shader_->SetUniform(material_uniform_.diffuse, container_diffuse_);
   shader_->SetUniform(material_uniform_.specular, container_specular_);
   shader_->SetUniform(material_uniform_.shininess, 32.0f);
-  shader_->SetUniform(tex_multiplier_uniform_, glm::vec2{1.0f, 1.0f});
+  shader_->SetUniform(tex_multiplier_uniform_, Eigen::Vector2f{1.0f, 1.0f});
 }
 
 RenderSystem::~RenderSystem() = default;
@@ -315,8 +316,9 @@ void RenderSystem::Render(Window& window, World& world, Entity* selected) {
 
     selected->ForEachComp<TransformComponent>(
         [&](TransformComponent& transform_component) {
-          glm::vec3 s(1.05f);
-          auto t = glm::scale(transform_component.transform, s);
+          Eigen::Vector3f s = Eigen::Vector3f::Ones() * 1.05f;
+          Eigen::Matrix4f t =
+              transform_component.transform * Eigen::Scale(s.x(), s.y(), s.z());
           outline_shader_->SetUniform(outline_model_uniform_, t);
         });
 

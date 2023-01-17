@@ -25,14 +25,13 @@ void Window::ProcessInput(float dt) {
   if (glfwGetKey(window_, GLFW_KEY_ESCAPE) == GLFW_PRESS)
     glfwSetWindowShouldClose(window_, true);
   const auto forward = dt * camera_->speed * camera_->front;
-  const auto right =
-      dt * glm::cross(camera_->front, camera_->up) * camera_->speed;
-  glm::vec2 k{0.0f, 0.0f};
-  if (glfwGetKey(window_, GLFW_KEY_W) == GLFW_PRESS) k.x = 1;
-  if (glfwGetKey(window_, GLFW_KEY_S) == GLFW_PRESS) k.x = -1;
-  if (glfwGetKey(window_, GLFW_KEY_A) == GLFW_PRESS) k.y = -1;
-  if (glfwGetKey(window_, GLFW_KEY_D) == GLFW_PRESS) k.y = 1;
-  camera_->eye += forward * k.x + right * k.y;
+  const auto right = camera_->speed * dt * camera_->front.cross(camera_->up);
+  Eigen::Vector2f k{0.0f, 0.0f};
+  if (glfwGetKey(window_, GLFW_KEY_W) == GLFW_PRESS) k.x() = 1;
+  if (glfwGetKey(window_, GLFW_KEY_S) == GLFW_PRESS) k.x() = -1;
+  if (glfwGetKey(window_, GLFW_KEY_A) == GLFW_PRESS) k.y() = -1;
+  if (glfwGetKey(window_, GLFW_KEY_D) == GLFW_PRESS) k.y() = 1;
+  camera_->eye += forward * k.x() + right * k.y();
 }
 
 void Window::SwapBuffers() noexcept { glfwSwapBuffers(window_); }
@@ -60,7 +59,8 @@ void Window::FrameBufferSizeCallback(GLFWwindow* glfw_window, int width,
 
 void Window::MouseCallback(GLFWwindow* glfw_window, double x, double y) {
   CallWndMethod<&Window::OnMouseMove>(
-      glfw_window, glm::vec2{static_cast<float>(x), static_cast<float>(y)});
+      glfw_window,
+      Eigen::Vector2f{static_cast<float>(x), static_cast<float>(y)});
 }
 
 void Window::MouseButtonCallback(GLFWwindow* glfw_window, int button,
@@ -93,8 +93,8 @@ void Window::Create() {
   double cursor_x;
   double cursor_y;
   glfwGetCursorPos(window_, &cursor_x, &cursor_y);
-  cursor_.x = static_cast<float>(cursor_x);
-  cursor_.y = static_cast<float>(cursor_y);
+  cursor_.x() = static_cast<float>(cursor_x);
+  cursor_.y() = static_cast<float>(cursor_y);
 
   spdlog::info("Created window {:d}", id_);
 }
@@ -112,12 +112,12 @@ void Window::OnResize(int width, int height) {
   height_ = static_cast<ui32>(height);
 }
 
-void Window::OnMouseMove(glm::vec2 new_cursor) {
+void Window::OnMouseMove(Eigen::Vector2f new_cursor) {
   float sensitivity = 0.001f;
   auto delta = (new_cursor - cursor_) * sensitivity;
   cursor_ = new_cursor;
   if (input_mode_) {
-    camera_->AddInput(glm::vec3(delta, 0.0f));
+    camera_->AddInput(Eigen::Vector3f(delta.x(), delta.y(), 0.0f));
   }
 }
 
@@ -140,7 +140,7 @@ void Window::OnMouseScroll([[maybe_unused]] float dx, float dy) {
   camera_->fov = std::clamp(camera_->fov, 15.0f, 90.0f);
 }
 
-glm::mat4 Window::GetView() const noexcept { return camera_->GetView(); }
-glm::mat4 Window::GetProjection() const noexcept {
+Eigen::Matrix4f Window::GetView() const noexcept { return camera_->GetView(); }
+Eigen::Matrix4f Window::GetProjection() const noexcept {
   return camera_->GetProjection(GetAspect());
 }

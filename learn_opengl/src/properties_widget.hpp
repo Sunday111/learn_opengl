@@ -14,110 +14,109 @@ template <typename T>
 concept Enumeration = std::is_enum_v<T>;
 
 namespace properties_container_impl {
-  template <typename Index, typename Value>
-  struct TypedIndex {
-    using ValueType = Value;
-    using IndexType = Index;
-    IndexType index;
-  };
+template <typename Index, typename Value>
+struct TypedIndex {
+  using ValueType = Value;
+  using IndexType = Index;
+  IndexType index;
+};
+
+template <typename T>
+struct PropertyTypeStorage {
+  std::vector<bool> changed;
+  std::vector<T> values;
+};
+
+template <typename Index, typename... Types>
+struct PropertiesContainer {
+ public:
+  template <typename T>
+  [[nodiscard]] Index AddProperty(T&& initial = T{}) {
+    auto& storage = GetTypeStorage<T>();
+    const auto full_index = storage.values.size();
+
+    if constexpr (sizeof(full_index) > sizeof(Index)) {
+      [[unlikely]] if (full_index > std::numeric_limits<Index>::max()) {
+        throw std::runtime_error(
+            "Index out of range: too small type for index in properties "
+            "container");
+      }
+    }
+
+    storage.values.push_back(std::forward<T>(initial));
+    storage.changed.push_back(false);
+    return static_cast<Index>(full_index);
+  }
 
   template <typename T>
-  struct PropertyTypeStorage {
-    std::vector<bool> changed;
-    std::vector<T> values;
-  };
+  void AddProperty(TypedIndex<Index, T>& index, T&& initial = T{}) {
+    index.index = AddProperty<T>(std::forward<T>(initial));
+  }
 
-  template <typename Index, typename... Types>
-  struct PropertiesContainer {
-   public:
-    template <typename T>
-    [[nodiscard]] Index AddProperty(T&& initial = T{}) {
-      auto& storage = GetTypeStorage<T>();
-      const auto full_index = storage.values.size();
+  template <typename T>
+  [[nodiscard]] bool IsPropertyChanged(
+      const TypedIndex<Index, T>& index) const noexcept {
+    return IsPropertyChanged<T>(index.index);
+  }
 
-      if constexpr (sizeof(full_index) > sizeof(Index)) {
-        [[unlikely]] if (full_index > std::numeric_limits<Index>::max()) {
-          throw std::runtime_error(
-              "Index out of range: too small type for index in properties "
-              "container");
-        }
-      }
+  template <typename T>
+  [[nodiscard]] bool IsPropertyChanged(Index index) const noexcept {
+    return GetTypeStorage<T>().changed[index];
+  }
 
-      storage.values.push_back(std::forward<T>(initial));
-      storage.changed.push_back(false);
-      return static_cast<Index>(full_index);
-    }
+  template <typename T>
+  [[nodiscard]] T& GetProperty(Index index) noexcept {
+    return GetTypeStorage<T>().values[index];
+  }
 
-    template <typename T>
-    void AddProperty(TypedIndex<Index, T>& index, T&& initial = T{}) {
-      index.index = AddProperty<T>(std::forward<T>(initial));
-    }
+  template <typename T>
+  [[nodiscard]] T& GetProperty(TypedIndex<Index, T> index) noexcept {
+    return GetProperty<T>(index.index);
+  }
 
-    template <typename T>
-    [[nodiscard]] bool IsPropertyChanged(
-        const TypedIndex<Index, T>& index) const noexcept {
-      return IsPropertyChanged<T>(index.index);
-    }
+  template <typename T>
+  [[nodiscard]] const T& GetProperty(Index index) const noexcept {
+    return GetTypeStorage<T>().values[index];
+  }
 
-    template <typename T>
-    [[nodiscard]] bool IsPropertyChanged(Index index) const noexcept {
-      return GetTypeStorage<T>().changed[index];
-    }
+  template <typename T>
+  [[nodiscard]] const T& GetProperty(
+      TypedIndex<Index, T> index) const noexcept {
+    return GetProperty<T>(index.index);
+  }
 
-    template <typename T>
-    [[nodiscard]] T& GetProperty(Index index) noexcept {
-      return GetTypeStorage<T>().values[index];
-    }
+  template <typename T>
+  void SetFlags(bool value) noexcept {
+    auto& changed = GetTypeStorage<T>().changed;
+    std::fill(changed.begin(), changed.end(), value);
+  }
 
-    template <typename T>
-    [[nodiscard]] T& GetProperty(TypedIndex<Index, T> index) noexcept {
-      return GetProperty<T>(index.index);
-    }
+  void SetAllFlags(bool value) noexcept { (..., SetFlags<Types>(value)); }
 
-    template <typename T>
-    [[nodiscard]] const T& GetProperty(Index index) const noexcept {
-      return GetTypeStorage<T>().values[index];
-    }
+  template <typename T>
+  void SetChanged(Index index, bool value) noexcept {
+    GetTypeStorage<T>().changed[index] = value;
+  }
 
-    template <typename T>
-    [[nodiscard]] const T& GetProperty(
-        TypedIndex<Index, T> index) const noexcept {
-      return GetProperty<T>(index.index);
-    }
+  template <typename T>
+  void SetChanged(TypedIndex<Index, T> index, bool value) noexcept {
+    SetChanged<T>(index.index, value);
+  }
 
-    template <typename T>
-    void SetFlags(bool value) noexcept {
-      auto& changed = GetTypeStorage<T>().changed;
-      std::fill(changed.begin(), changed.end(), value);
-    }
+ private:
+  template <typename T>
+  [[nodiscard]] PropertyTypeStorage<T>& GetTypeStorage() noexcept {
+    return std::get<PropertyTypeStorage<T>>(data);
+  }
 
-    void SetAllFlags(bool value) noexcept { (..., SetFlags<Types>(value)); }
+  template <typename T>
+  [[nodiscard]] const PropertyTypeStorage<T>& GetTypeStorage() const noexcept {
+    return std::get<PropertyTypeStorage<T>>(data);
+  }
 
-    template <typename T>
-    void SetChanged(Index index, bool value) noexcept {
-      GetTypeStorage<T>().changed[index] = value;
-    }
-
-    template <typename T>
-    void SetChanged(TypedIndex<Index, T> index, bool value) noexcept {
-      SetChanged<T>(index.index, value);
-    }
-
-   private:
-    template <typename T>
-    [[nodiscard]] PropertyTypeStorage<T>& GetTypeStorage() noexcept {
-      return std::get<PropertyTypeStorage<T>>(data);
-    }
-
-    template <typename T>
-    [[nodiscard]] const PropertyTypeStorage<T>& GetTypeStorage()
-        const noexcept {
-      return std::get<PropertyTypeStorage<T>>(data);
-    }
-
-   private:
-    std::tuple<PropertyTypeStorage<Types>...> data;
-  };
+ private:
+  std::tuple<PropertyTypeStorage<Types>...> data;
+};
 }  // namespace properties_container_impl
 
 class ProgramProperties {
@@ -125,11 +124,11 @@ class ProgramProperties {
   using PropIndex = ui8;
   using PropsData = properties_container_impl::PropertiesContainer<
       PropIndex, float, bool, GlTextureWrapMode, GlTextureFilter, GlPolygonMode,
-      glm::vec2, glm::vec3, glm::vec4, glm::mat4>;
+      Eigen::Vector2f, Eigen::Vector3f, Eigen::Vector4f, Eigen::Matrix4f>;
 
   template <typename T>
   using TypedIndex = properties_container_impl::TypedIndex<PropIndex, T>;
-  using ColorIndex = TypedIndex<glm::vec4>;
+  using ColorIndex = TypedIndex<Eigen::Vector4f>;
   using FloatIndex = TypedIndex<float>;
 
  public:
@@ -174,9 +173,9 @@ class ProgramProperties {
   TypedIndex<GlTextureFilter> mag_filter;
 
   // Camera
-  TypedIndex<glm::vec3> eye;
-  TypedIndex<glm::vec3> look_at;
-  TypedIndex<glm::vec3> camera_up;
+  TypedIndex<Eigen::Vector3f> eye;
+  TypedIndex<Eigen::Vector3f> look_at;
+  TypedIndex<Eigen::Vector3f> camera_up;
 
  private:
   PropsData props_data_;
@@ -195,35 +194,38 @@ struct ParametersWidget {
                      float min, float max) noexcept;
 
   template <typename T, int N>
-  void VectorProperty(const char* title,
-                      ProgramProperties::TypedIndex<glm::vec<N, T>> index,
-                      T min = std::numeric_limits<T>::lowest(),
-                      T max = std::numeric_limits<T>::max()) noexcept {
+  void VectorProperty(
+      const char* title,
+      ProgramProperties::TypedIndex<Eigen::Matrix<T, N, 1>> index,
+      T min = std::numeric_limits<T>::lowest(),
+      T max = std::numeric_limits<T>::max()) noexcept {
     auto& value = Get(index);
-    [[unlikely]] if (ImGui::DragScalarN(title, CastDataType<T>(),
-                                        glm::value_ptr(value), N, 0.01f, &min,
-                                        &max, "%.3f")) {
+    [[unlikely]] if (ImGui::DragScalarN(title, CastDataType<T>(), value.data(),
+                                        N, 0.01f, &min, &max, "%.3f")) {
       MarkChanged(index);
     }
   }
 
+  // TODO: convert to eigen
   template <typename T, int C, int R>
-  void MatrixProperty(const char* ppp,
-                      ProgramProperties::TypedIndex<glm::mat<C, R, T>> index,
-                      T min = std::numeric_limits<T>::lowest(),
-                      T max = std::numeric_limits<T>::max()) noexcept {
+  void MatrixProperty(
+      const char* ppp,
+      ProgramProperties::TypedIndex<Eigen::Matrix<T, R, C>> index,
+      T min = std::numeric_limits<T>::lowest(),
+      T max = std::numeric_limits<T>::max()) noexcept {
     ImGui::PushID(ppp);
-    auto& value = Get(index);
+    Eigen::Matrix<T, R, C>& value = Get(index);
     bool changed = false;
     for (int row_index = 0; row_index < R; ++row_index) {
-      auto row = glm::row(value, row_index);
+      value.block();
+      auto row_view = value.template block<1, C>(row_index, 0);
+      Eigen::Matrix<T, R, 1> row = row_view;
       ImGui::PushID(row_index);
-      const bool row_changed =
-          ImGui::DragScalarN("", CastDataType<T>(), glm::value_ptr(row), C,
-                             0.01f, &min, &max, "%.3f");
+      const bool row_changed = ImGui::DragScalarN(
+          "", CastDataType<T>(), row.data(), C, 0.01f, &min, &max, "%.3f");
       ImGui::PopID();
       [[unlikely]] if (row_changed) {
-        value = glm::row(value, row_index, row);
+        row_view = row;
         changed = true;
       }
     }
@@ -261,8 +263,9 @@ struct ParametersWidget {
   }
 
   template <typename T, int N>
-  [[nodiscard]] static bool VectorChanged(const glm::vec<N, T>& a,
-                                          const glm::vec<N, T>& b) noexcept {
+  [[nodiscard]] static bool VectorChanged(
+      const Eigen::Matrix<T, N, 1>& a,
+      const Eigen::Matrix<T, N, 1>& b) noexcept {
     bool result = false;
     for (int i = 0; i < N; ++i) {
       result |= FloatChanged(a[i], b[i]);

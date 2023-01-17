@@ -74,8 +74,8 @@ void OpenGl::SetClearColor(GLfloat red, GLfloat green, GLfloat blue,
                            GLfloat alpha) noexcept {
   glClearColor(red, green, blue, alpha);
 }
-void OpenGl::SetClearColor(const glm::vec4& color) noexcept {
-  SetClearColor(color.r, color.g, color.b, color.a);
+void OpenGl::SetClearColor(const Eigen::Vector4f& color) noexcept {
+  SetClearColor(color.x(), color.y(), color.z(), color.w());
 }
 
 void OpenGl::Clear(GLbitfield mask) noexcept { glClear(mask); }
@@ -106,23 +106,29 @@ void OpenGl::SetUniform(ui32 location, const float& f) noexcept {
   glUniform1f(static_cast<GLint>(location), f);
 }
 
-void OpenGl::SetUniform(ui32 location, const glm::mat4& m,
+void OpenGl::SetUniform(ui32 location, const Eigen::Matrix4f& m,
                         bool transpose) noexcept {
   glUniformMatrix4fv(static_cast<GLint>(location), 1, CastBool(transpose),
-                     glm::value_ptr(m));
+                     m.data());
+}
+
+void OpenGl::SetUniform(ui32 location, const Eigen::Matrix3f& m,
+                        bool transpose) noexcept {
+  glUniformMatrix3fv(static_cast<GLint>(location), 1, CastBool(transpose),
+                     m.data());
 }
 void OpenGl::EnableDepthTest() noexcept { glEnable(GL_DEPTH_TEST); }
 
-void OpenGl::SetUniform(ui32 location, const glm::vec4& v) noexcept {
-  glUniform4f(static_cast<GLint>(location), v.r, v.g, v.b, v.a);
+void OpenGl::SetUniform(ui32 location, const Eigen::Vector4f& v) noexcept {
+  glUniform4f(static_cast<GLint>(location), v.x(), v.y(), v.z(), v.w());
 }
 
-void OpenGl::SetUniform(ui32 location, const glm::vec3& v) noexcept {
-  glUniform3f(static_cast<GLint>(location), v.r, v.g, v.b);
+void OpenGl::SetUniform(ui32 location, const Eigen::Vector3f& v) noexcept {
+  glUniform3f(static_cast<GLint>(location), v.x(), v.y(), v.z());
 }
 
-void OpenGl::SetUniform(ui32 location, const glm::vec2& v) noexcept {
-  glUniform2f(static_cast<GLint>(location), v.r, v.g);
+void OpenGl::SetUniform(ui32 location, const Eigen::Vector2f& v) noexcept {
+  glUniform2f(static_cast<GLint>(location), v.x(), v.y());
 }
 
 void OpenGl::SetTextureParameter(GLenum target, GLenum pname,
@@ -135,7 +141,7 @@ void OpenGl::SetTextureParameter(GLenum target, GLenum name,
   glTexParameteri(target, name, param);
 }
 
-void OpenGl::SetTexture2dBorderColor(const glm::vec4& v) noexcept {
+void OpenGl::SetTexture2dBorderColor(const Eigen::Vector4f& v) noexcept {
   SetTextureParameter2d(GL_TEXTURE_BORDER_COLOR,
                         reinterpret_cast<const float*>(&v));
 }

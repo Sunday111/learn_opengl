@@ -6,7 +6,7 @@
 #include "EverydayTools/GUID_fmtlib.hpp"
 #include "fmt/format.h"
 #include "opengl/gl_api.hpp"
-#include "reflection/glm_reflect.hpp"
+#include "reflection/eigen_reflect.hpp"
 #include "sampler_uniform.hpp"
 #include "spdlog/spdlog.h"
 
@@ -76,11 +76,11 @@ void ShaderUniform::SendValue() const {
 
   const bool type_found =
       SendActualValue<float>(type_guid_, location_, value_) ||
-      SendActualValue<glm::vec2>(type_guid_, location_, value_) ||
-      SendActualValue<glm::vec3>(type_guid_, location_, value_) ||
-      SendActualValue<glm::vec4>(type_guid_, location_, value_) ||
-      SendActualValue<glm::mat3>(type_guid_, location_, value_) ||
-      SendActualValue<glm::mat4>(type_guid_, location_, value_) ||
+      SendActualValue<Eigen::Vector2f>(type_guid_, location_, value_) ||
+      SendActualValue<Eigen::Vector3f>(type_guid_, location_, value_) ||
+      SendActualValue<Eigen::Vector4f>(type_guid_, location_, value_) ||
+      SendActualValue<Eigen::Matrix3f>(type_guid_, location_, value_) ||
+      SendActualValue<Eigen::Matrix4f>(type_guid_, location_, value_) ||
       SendActualValue<SamplerUniform>(type_guid_, location_, value_);
 
   [[unlikely]] if (!type_found) {

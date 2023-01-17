@@ -2,7 +2,7 @@
 
 #include "components/component.hpp"
 #include "components/lights/attenuation.hpp"
-#include "reflection/glm_reflect.hpp"
+#include "reflection/eigen_reflect.hpp"
 
 class SpotLightComponent : public SimpleComponentBase<SpotLightComponent> {
  public:
@@ -10,9 +10,9 @@ class SpotLightComponent : public SimpleComponentBase<SpotLightComponent> {
   ~SpotLightComponent() = default;
 
   Attenuation attenuation;
-  glm::vec3 diffuse = glm::vec3(1.0f, 1.0f, 1.0f);
-  glm::vec3 specular = glm::vec3(1.0f, 1.0f, 1.0f);
-  glm::vec3 direction = glm::vec3(1.0f, 0.0f, 0.0f);
+  Eigen::Vector3f diffuse = Eigen::Vector3f(1.0f, 1.0f, 1.0f);
+  Eigen::Vector3f specular = Eigen::Vector3f(1.0f, 1.0f, 1.0f);
+  Eigen::Vector3f direction = Eigen::Vector3f(1.0f, 0.0f, 0.0f);
   float innerAngle;
   float outerAngle;
 };

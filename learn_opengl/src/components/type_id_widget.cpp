@@ -3,8 +3,8 @@
 #include "CppReflection/GetStaticTypeInfo.hpp"
 #include "CppReflection/TypeRegistry.hpp"
 #include "integer.hpp"
-#include "reflection/glm_reflect.hpp"
-#include "wrap/wrap_glm.hpp"
+#include "reflection/eigen_reflect.hpp"
+#include "wrap/wrap_eigen.hpp"
 #include "wrap/wrap_imgui.h"
 
 template <typename T>
@@ -25,12 +25,11 @@ bool ScalarProperty(edt::GUID type_guid, std::string_view name, void* address,
 }
 
 template <typename T, int N>
-bool VectorProperty(std::string_view title, glm::vec<N, T>& value,
+bool VectorProperty(std::string_view title, Eigen::Matrix<T, N, 1>& value,
                     T min = std::numeric_limits<T>::lowest(),
                     T max = std::numeric_limits<T>::max()) noexcept {
-  return ImGui::DragScalarN(title.data(), CastDataType<T>(),
-                            glm::value_ptr(value), N, 0.01f, &min, &max,
-                            "%.3f");
+  return ImGui::DragScalarN(title.data(), CastDataType<T>(), value.data(), N,
+                            0.01f, &min, &max, "%.3f");
 }
 
 template <typename T>
@@ -47,19 +46,19 @@ bool VectorProperty(edt::GUID type_guid, std::string_view name, void* address,
 }
 
 template <typename T, int C, int R>
-bool MatrixProperty(const std::string_view title, glm::mat<C, R, T>& value,
+bool MatrixProperty(const std::string_view title, Eigen::Matrix<T, R, C>& value,
                     T min = std::numeric_limits<T>::lowest(),
                     T max = std::numeric_limits<T>::max()) noexcept {
   bool changed = false;
   if (ImGui::TreeNode(title.data())) {
     for (int row_index = 0; row_index < R; ++row_index) {
-      auto row = glm::row(value, row_index);
+      auto row_view = value.template block<1, C>(row_index, 0);
+      Eigen::Matrix<T, R, 1> row = row_view;
       ImGui::PushID(row_index);
-      const bool row_changed =
-          ImGui::DragScalarN("", CastDataType<T>(), glm::value_ptr(row), C,
-                             0.01f, &min, &max, "%.3f");
+      const bool row_changed = ImGui::DragScalarN(
+          "", CastDataType<T>(), row.data(), C, 0.01f, &min, &max, "%.3f");
       ImGui::PopID();
-      [[unlikely]] if (row_changed) { value = glm::row(value, row_index, row); }
+      [[unlikely]] if (row_changed) { row_view = row; }
       changed = changed || row_changed;
     }
     ImGui::TreePop();
@@ -94,10 +93,10 @@ void SimpleTypeWidget(edt::GUID type_guid, std::string_view name, void* value,
       ScalarProperty<i16>(type_guid, name, value, value_changed) ||
       ScalarProperty<i32>(type_guid, name, value, value_changed) ||
       ScalarProperty<i64>(type_guid, name, value, value_changed) ||
-      VectorProperty<glm::vec2>(type_guid, name, value, value_changed) ||
-      VectorProperty<glm::vec3>(type_guid, name, value, value_changed) ||
-      VectorProperty<glm::vec4>(type_guid, name, value, value_changed) ||
-      MatrixProperty<glm::mat4>(type_guid, name, value, value_changed);
+      VectorProperty<Eigen::Vector2f>(type_guid, name, value, value_changed) ||
+      VectorProperty<Eigen::Vector3f>(type_guid, name, value, value_changed) ||
+      VectorProperty<Eigen::Vector4f>(type_guid, name, value, value_changed) ||
+      MatrixProperty<Eigen::Matrix4f>(type_guid, name, value, value_changed);
 }
 
 void TypeIdWidget(edt::GUID type_guid, void* base, bool& value_changed) {

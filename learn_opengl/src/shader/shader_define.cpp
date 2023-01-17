@@ -5,7 +5,7 @@
 #include "CppReflection/GetStaticTypeInfo.hpp"
 #include "EverydayTools/GUID_fmtlib.hpp"
 #include "components/type_id_widget.hpp"
-#include "reflection/glm_reflect.hpp"
+#include "reflection/eigen_reflect.hpp"
 
 ShaderDefine::ShaderDefine(ShaderDefine&& another) { MoveFrom(another); }
 
@@ -26,9 +26,9 @@ std::string ShaderDefine::GenDefine() const {
     value_str = fmt::format("{}", CastBuffer<int>(value));
   } else if (type_guid == cppreflection::GetStaticTypeGUID<float>()) {
     value_str = fmt::format("{}", CastBuffer<float>(value));
-  } else if (type_guid == cppreflection::GetStaticTypeGUID<glm::vec3>()) {
-    const auto& vec = CastBuffer<glm::vec3>(value);
-    value_str = fmt::format("vec3({}, {}, {})", vec.x, vec.y, vec.z);
+  } else if (type_guid == cppreflection::GetStaticTypeGUID<Eigen::Vector3f>()) {
+    const auto& vec = CastBuffer<Eigen::Vector3f>(value);
+    value_str = fmt::format("vec3({}, {}, {})", vec.x(), vec.y(), vec.z());
   }
 
   return fmt::format("#define {} {}\n", name.GetView(), value_str);
@@ -70,17 +70,17 @@ ShaderDefine ShaderDefine::ReadFromJson(const nlohmann::json& json) {
     int v = default_value_json;
     def.SetValue(MakeValueSpan(v));
   } else if (type_name == "vec3") {
-    def.type_guid = cppreflection::GetStaticTypeGUID<glm::vec3>();
-    glm::vec3 v;
-    v.x = default_value_json["x"];
-    v.y = default_value_json["y"];
-    v.z = default_value_json["z"];
+    def.type_guid = cppreflection::GetStaticTypeGUID<Eigen::Vector3f>();
+    Eigen::Vector3f v;
+    v.x() = default_value_json["x"];
+    v.y() = default_value_json["y"];
+    v.z() = default_value_json["z"];
     def.SetValue(MakeValueSpan(v));
   } else if (type_name == "vec2") {
-    def.type_guid = cppreflection::GetStaticTypeGUID<glm::vec2>();
-    glm::vec2 v;
-    v.x = default_value_json["x"];
-    v.y = default_value_json["y"];
+    def.type_guid = cppreflection::GetStaticTypeGUID<Eigen::Vector2f>();
+    Eigen::Vector2f v;
+    v.x() = default_value_json["x"];
+    v.y() = default_value_json["y"];
     def.SetValue(MakeValueSpan(v));
   } else {
     throw std::runtime_error(

@@ -12,7 +12,7 @@ struct TypeToGlType<float> {
 };
 
 template <typename T, int N>
-struct TypeToGlType<glm::vec<N, T>> {
+struct TypeToGlType<Eigen::Matrix<T, N, 1>> {
   static constexpr size_t Size = static_cast<size_t>(N);
   static constexpr GLenum Type = TypeToGlType<T>::Type;
 };

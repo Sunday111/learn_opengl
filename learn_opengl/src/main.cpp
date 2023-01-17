@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "EverydayTools/Math/deg_to_rad.hpp"
 #include "components/camera_component.hpp"
 #include "components/lights/directional_light_component.hpp"
 #include "components/lights/point_light_component.hpp"
@@ -20,7 +21,7 @@
 #include "opengl/debug/gl_debug_messenger.hpp"
 #include "properties_widget.hpp"
 #include "read_file.hpp"
-#include "reflection/glm_reflect.hpp"
+#include "reflection/eigen_reflect.hpp"
 #include "reflection/register_types.hpp"
 #include "render_system.hpp"
 #include "shader/shader.hpp"
@@ -29,8 +30,8 @@
 #include "texture/texture_manager.hpp"
 #include "window.hpp"
 #include "world.hpp"
+#include "wrap/wrap_eigen.hpp"
 #include "wrap/wrap_glfw.hpp"
-#include "wrap/wrap_glm.hpp"
 #include "wrap/wrap_imgui.h"
 
 class GlfwState {
@@ -108,7 +109,7 @@ void CreateMeshes(World& world, const std::shared_ptr<Shader>& shader) {
       auto& entity = world.SpawnEntity<Entity>();
       entity.SetName(fmt::format("mesh [x:{}, y:{}]", x, y));
       MeshComponent& mesh = entity.AddComponent<MeshComponent>();
-      const glm::vec3 cube_color(1.0f, 1.0f, 1.0f);
+      const Eigen::Vector3f cube_color(1.0f, 1.0f, 1.0f);
       mesh.MakeCube(1.0f, cube_color, shader);  //
       auto& t = entity.AddComponent<TransformComponent>();
 
@@ -118,9 +119,7 @@ void CreateMeshes(World& world, const std::shared_ptr<Shader>& shader) {
       const float py =
           (static_cast<float>(y) * height / static_cast<float>(ny)) -
           (height / 2);
-      const float pz = 0.0f;
-      auto position = glm::vec3(px, py, pz);
-      t.transform = glm::translate(t.transform, position);
+      t.transform *= Eigen::Translate(px, py, 0.0f);
     }
   }
 }
@@ -130,10 +129,10 @@ void CreatePointLights(World& world, RenderSystem& render_system) {
   float radius = 5.0f;
 
   std::array light_colors{
-      glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, 1.0f, 0.0f),
-      glm::vec3(0.0f, 1.0f, 1.0f), glm::vec3(1.0f, 0.0f, 0.0f),
-      glm::vec3(1.0f, 0.0f, 1.0f), glm::vec3(1.0f, 1.0f, 0.0f),
-      glm::vec3(1.0f, 1.0f, 1.0f)};
+      Eigen::Vector3f(0.0f, 0.0f, 1.0f), Eigen::Vector3f(0.0f, 1.0f, 0.0f),
+      Eigen::Vector3f(0.0f, 1.0f, 1.0f), Eigen::Vector3f(1.0f, 0.0f, 0.0f),
+      Eigen::Vector3f(1.0f, 0.0f, 1.0f), Eigen::Vector3f(1.0f, 1.0f, 0.0f),
+      Eigen::Vector3f(1.0f, 1.0f, 1.0f)};
 
   for (size_t light_index = 0; light_index < num_lights; ++light_index) {
     Entity& entity = world.SpawnEntity<Entity>();
@@ -141,7 +140,7 @@ void CreatePointLights(World& world, RenderSystem& render_system) {
     PointLightComponent& light = entity.AddComponent<PointLightComponent>();
     const auto light_color = light_colors[light_index % light_colors.size()];
     light.diffuse = light_color;
-    light.ambient = glm::vec3(0.0f);
+    light.ambient = Eigen::Vector3f::Zero();
     light.specular = light_color;
     MeshComponent& mesh = entity.AddComponent<MeshComponent>();
     mesh.MakeCube(0.2f, light_color, render_system.shader_);
@@ -149,12 +148,13 @@ void CreatePointLights(World& world, RenderSystem& render_system) {
 
     float angle = (360.0f * static_cast<float>(light_index)) /
                   static_cast<float>(num_lights);
-    float y = glm::sin(glm::radians(angle));
-    float x = glm::cos(glm::radians(angle));
+    float y = std::sin(edt::DegToRad(angle));
+    float x = std::cos(edt::DegToRad(angle));
 
-    const glm::vec3 location =
-        glm::vec3(0.0f, 0.0f, 1.0f) + glm::vec3(x, y, 0.0f) * radius;
-    transform.transform = glm::translate(transform.transform, location);
+    const Eigen::Vector3f location = Eigen::Vector3f(0.0f, 0.0f, 1.0f) +
+                                     Eigen::Vector3f(x, y, 0.0f) * radius;
+    transform.transform *=
+        Eigen::Translate(location.x(), location.y(), location.z());
 
     render_system.point_lights_.push_back({&transform, &light});
   }
@@ -234,7 +234,7 @@ void Main([[maybe_unused]] int argc, char** argv) {
   //// Create entity with directional light component
   //{
   //  Entity& entity = world.SpawnEntity<Entity>();
-  //  const glm::vec3 light_color(1.0f, 1.0f, 1.0f);
+  //  const Eigen::Vector3f light_color(1.0f, 1.0f, 1.0f);
   //  entity.SetName("DirectionalLight");
   //  auto& light = entity.AddComponent<DirectionalLightComponent>();
   //  light.diffuse = light_color;
@@ -243,7 +243,7 @@ void Main([[maybe_unused]] int argc, char** argv) {
   //
   //  auto& transform = entity.AddComponent<TransformComponent>();
   //  transform.transform = glm::yawPitchRoll(
-  //      glm::radians(0.0f), glm::radians(0.0f), glm::radians(0.0f));
+  //      edt::DegToRad(0.0f), edt::DegToRad(0.0f), edt::DegToRad(0.0f));
   //
   //  render_system.directional_lights_.push_back({&transform, &light});
   //}
@@ -251,19 +251,20 @@ void Main([[maybe_unused]] int argc, char** argv) {
   //// Create entity with spot light component
   //{
   //  Entity& entity = world.SpawnEntity<Entity>();
-  //  const glm::vec3 light_color(1.0f, 1.0f, 1.0f);
+  //  const Eigen::Vector3f light_color(1.0f, 1.0f, 1.0f);
   //  entity.SetName("SpotLight");
   //  auto& light = entity.AddComponent<SpotLightComponent>();
   //  light.diffuse = light_color;
   //  light.specular = light_color;
-  //  light.innerAngle = glm::cos(glm::radians(12.5f));
-  //  light.outerAngle = glm::cos(glm::radians(15.0f));
+  //  light.innerAngle = glm::cos(edt::DegToRad(12.5f));
+  //  light.outerAngle = glm::cos(edt::DegToRad(15.0f));
   //
   //  auto& transform = entity.AddComponent<TransformComponent>();
   //  transform.transform =
-  //      glm::translate(transform.transform, glm::vec3(0.0f, 0.0, 1.0f));
+  //      Eigen::Translate(transform.transform, Eigen::Vector3f(0.0f,
+  //      0.0, 1.0f));
   //  transform.transform *= glm::yawPitchRoll(
-  //      glm::radians(0.0f), glm::radians(-90.0f), glm::radians(0.0f));
+  //      edt::DegToRad(0.0f), edt::DegToRad(-90.0f), edt::DegToRad(0.0f));
   //
   //  render_system.spot_lights_.push_back({&transform, &light});
   //}

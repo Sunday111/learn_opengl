@@ -1,8 +1,8 @@
 #pragma once
 
 #include "components/component.hpp"
-#include "reflection/glm_reflect.hpp"
-#include "wrap/wrap_glm.hpp"
+#include "reflection/eigen_reflect.hpp"
+#include "wrap/wrap_eigen.hpp"
 
 class DirectionalLightComponent
     : public SimpleComponentBase<DirectionalLightComponent> {
@@ -10,9 +10,9 @@ class DirectionalLightComponent
   DirectionalLightComponent() = default;
   ~DirectionalLightComponent() = default;
 
-  glm::vec3 ambient = glm::vec3(0.1f, 0.1f, 0.1f);
-  glm::vec3 diffuse = glm::vec3(1.0f, 1.0f, 1.0f);
-  glm::vec3 specular = glm::vec3(1.0f, 1.0f, 1.0f);
+  Eigen::Vector3f ambient = Eigen::Vector3f(0.1f, 0.1f, 0.1f);
+  Eigen::Vector3f diffuse = Eigen::Vector3f(1.0f, 1.0f, 1.0f);
+  Eigen::Vector3f specular = Eigen::Vector3f(1.0f, 1.0f, 1.0f);
 };
 
 namespace cppreflection {

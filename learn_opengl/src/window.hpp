@@ -3,7 +3,7 @@
 #include <memory>
 
 #include "integer.hpp"
-#include "wrap/wrap_glm.hpp"
+#include "wrap/wrap_eigen.hpp"
 
 struct GLFWwindow;
 class CameraComponent;
@@ -19,8 +19,8 @@ class Window {
   [[nodiscard]] ui32 GetWidth() const noexcept { return width_; }
   [[nodiscard]] ui32 GetHeight() const noexcept { return height_; }
   [[nodiscard]] GLFWwindow* GetGlfwWindow() const noexcept { return window_; }
-  [[nodiscard]] glm::mat4 GetView() const noexcept;
-  [[nodiscard]] glm::mat4 GetProjection() const noexcept;
+  [[nodiscard]] Eigen::Matrix4f GetView() const noexcept;
+  [[nodiscard]] Eigen::Matrix4f GetProjection() const noexcept;
   [[nodiscard]] float GetAspect() const noexcept {
     return static_cast<float>(GetWidth()) / static_cast<float>(GetHeight());
   }
@@ -52,14 +52,14 @@ class Window {
   void Create();
   void Destroy();
   void OnResize(int width, int height);
-  void OnMouseMove(glm::vec2 new_cursor);
+  void OnMouseMove(Eigen::Vector2f new_cursor);
   void OnMouseButton(int button, int action, [[maybe_unused]] int mods);
   void OnMouseScroll([[maybe_unused]] float dx, float dy);
 
  private:
   GLFWwindow* window_ = nullptr;
   CameraComponent* camera_ = nullptr;
-  glm::vec2 cursor_;
+  Eigen::Vector2f cursor_;
   ui32 id_;
   ui32 width_;
   ui32 height_;

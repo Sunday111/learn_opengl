@@ -117,6 +117,15 @@
         "semaphore": "cpp",
         "strstream": "cpp",
         "cfenv": "cpp",
-        "*.ipp": "cpp"
+        "*.ipp": "cpp",
+        "*.inc": "cpp",
+        "*.evaluator": "cpp",
+        "*.expression": "cpp",
+        "adolcforward": "cpp",
+        "alignedvector3": "cpp",
+        "fft": "cpp",
+        "mprealsupport": "cpp",
+        "nnls": "cpp",
+        "hash_map": "cpp"
     }
 }

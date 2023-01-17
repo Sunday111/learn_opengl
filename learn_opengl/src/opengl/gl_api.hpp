@@ -19,7 +19,7 @@
 #include "fmt/format.h"
 #include "integer.hpp"
 #include "template/get_enum_underlying.hpp"
-#include "wrap/wrap_glm.hpp"
+#include "wrap/wrap_eigen.hpp"
 
 enum class GlPolygonMode : ui8 { Point, Line, Fill, Max };
 enum class GlTextureWrap : ui8 { S, T, R, Max };
@@ -88,7 +88,7 @@ class OpenGl {
 
   static void SetClearColor(GLfloat red, GLfloat green, GLfloat blue,
                             GLfloat alpha) noexcept;
-  static void SetClearColor(const glm::vec4& color) noexcept;
+  static void SetClearColor(const Eigen::Vector4f& color) noexcept;
 
   static void Clear(GLbitfield mask) noexcept;
 
@@ -111,14 +111,17 @@ class OpenGl {
 
   static void SetUniform(ui32 location, const float& f) noexcept;
 
-  static void SetUniform(ui32 location, const glm::mat4& m,
+  static void SetUniform(ui32 location, const Eigen::Matrix4f& m,
                          bool transpose = false) noexcept;
 
-  static void SetUniform(ui32 location, const glm::vec4& v) noexcept;
+  static void SetUniform(ui32 location, const Eigen::Matrix3f& m,
+                         bool transpose = false) noexcept;
 
-  static void SetUniform(ui32 location, const glm::vec3& v) noexcept;
+  static void SetUniform(ui32 location, const Eigen::Vector4f& v) noexcept;
 
-  static void SetUniform(ui32 location, const glm::vec2& v) noexcept;
+  static void SetUniform(ui32 location, const Eigen::Vector3f& v) noexcept;
+
+  static void SetUniform(ui32 location, const Eigen::Vector2f& v) noexcept;
 
   static void SetTextureParameter(GLenum target, GLenum pname,
                                   const GLfloat* value) noexcept;
@@ -131,7 +134,7 @@ class OpenGl {
     SetTextureParameter(GL_TEXTURE_2D, pname, value);
   }
 
-  static void SetTexture2dBorderColor(const glm::vec4& v) noexcept;
+  static void SetTexture2dBorderColor(const Eigen::Vector4f& v) noexcept;
 
   static void SetTexture2dWrap(GlTextureWrap wrap,
                                GlTextureWrapMode mode) noexcept;

@@ -10,6 +10,7 @@
 #include "components/mesh_component.hpp"
 #include "components/transform_component.hpp"
 #include "entities/entity.hpp"
+#include "reflection/eigen_reflect.hpp"
 #include "reflection/glm_reflect.hpp"
 #include "shader/sampler_uniform.hpp"
 #include "spdlog/spdlog.h"
@@ -25,10 +26,15 @@ inline void RegisterReflectionTypes() {
   t = cppreflection::GetTypeInfo<uint32_t>();
   t = cppreflection::GetTypeInfo<uint64_t>();
   t = cppreflection::GetTypeInfo<glm::vec2>();
-  t = cppreflection::GetTypeInfo<glm::vec3>();
-  t = cppreflection::GetTypeInfo<glm::vec4>();
-  t = cppreflection::GetTypeInfo<glm::mat3>();
-  t = cppreflection::GetTypeInfo<glm::mat4>();
+  t = cppreflection::GetTypeInfo<Eigen::Vector3f>();
+  t = cppreflection::GetTypeInfo<Eigen::Vector4f>();
+  t = cppreflection::GetTypeInfo<Eigen::Matrix3f>();
+  t = cppreflection::GetTypeInfo<Eigen::Matrix4f>();
+  t = cppreflection::GetTypeInfo<Eigen::Vector2f>();
+  t = cppreflection::GetTypeInfo<Eigen::Vector3f>();
+  t = cppreflection::GetTypeInfo<Eigen::Vector4f>();
+  t = cppreflection::GetTypeInfo<Eigen::Matrix3f>();
+  t = cppreflection::GetTypeInfo<Eigen::Matrix4f>();
   t = cppreflection::GetTypeInfo<Component>();
   t = cppreflection::GetTypeInfo<CameraComponent>();
   t = cppreflection::GetTypeInfo<MeshComponent>();

@@ -2,24 +2,24 @@
 
 #include "CppReflection/GetStaticTypeInfo.hpp"
 #include "components/component.hpp"
-#include "reflection/glm_reflect.hpp"
+#include "reflection/eigen_reflect.hpp"
 
 class CameraComponent : public SimpleComponentBase<CameraComponent> {
  public:
-  [[nodiscard]] glm::mat4 GetProjection(float aspect) const noexcept;
-  [[nodiscard]] glm::mat4 GetView() const noexcept;
-  void AddInput(glm::vec3 YawPitchRoll);
+  [[nodiscard]] Eigen::Matrix4f GetProjection(float aspect) const noexcept;
+  [[nodiscard]] Eigen::Matrix4f GetView() const noexcept;
+  void AddInput(Eigen::Vector3f YawPitchRoll);
 
   float speed = 1.0f;
   float near_plane = 0.01f;
   float far_plane = 1000.0f;
   float fov = 45.0f;
-  glm::vec3 eye = {0.0f, 0.0f, 3.0f};
-  glm::vec3 front = {1.0f, 0.0f, 0.0f};
-  glm::vec3 up = {0.0f, 0.0f, 1.0f};
+  Eigen::Vector3f eye = {0.0f, 0.0f, 3.0f};
+  Eigen::Vector3f front = {1.0f, 0.0f, 0.0f};
+  Eigen::Vector3f up = {0.0f, 0.0f, 1.0f};
 
  private:
-  glm::vec3 r = {0.0f, 0.0f, 0.0f};
+  Eigen::Vector3f r = {0.0f, 0.0f, 0.0f};
 };
 
 namespace cppreflection {

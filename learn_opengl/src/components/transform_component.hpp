@@ -1,14 +1,27 @@
 #pragma once
 
 #include "components/component.hpp"
-#include "reflection/glm_reflect.hpp"
+#include "reflection/eigen_reflect.hpp"
 
 class TransformComponent : public SimpleComponentBase<TransformComponent> {
  public:
-  TransformComponent() = default;
+  TransformComponent() {
+    Eigen::Transform<float, 3, Eigen::Affine> tr;
+    tr.matrix().setIdentity();
+    transform = tr.matrix();
+  }
   ~TransformComponent() = default;
 
-  glm::mat4 transform = glm::mat4(1.0f);
+  [[nodiscard]] Eigen::Vector3f GetTranslation() const {
+    Eigen::Transform<float, 3, Eigen::Affine> tr(transform);
+    return tr.translation();
+  }
+
+  [[nodiscard]] Eigen::Matrix3f GetRotationMtx() const {
+    return transform.block<3, 3>(0, 0);
+  }
+
+  Eigen::Matrix4f transform;
 };
 
 namespace cppreflection {

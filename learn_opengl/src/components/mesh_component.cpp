@@ -126,7 +126,7 @@ constexpr std::array<ui32, 6> get_square_indices(bool clockwise) {
   }
 }
 
-void MeshComponent::MakeCube(float width, const glm::vec3& color,
+void MeshComponent::MakeCube(float width, const Eigen::Vector3f& color,
                              const std::shared_ptr<Shader>& shader) {
   std::vector<Vertex> vertices;
   std::vector<ui32> indices;
@@ -140,8 +140,8 @@ void MeshComponent::MakeCube(float width, const glm::vec3& color,
    * 2 ---- 3
    */
 
-  using v3f = glm::vec3;
-  using v2f = glm::vec2;
+  using v3f = Eigen::Vector3f;
+  using v2f = Eigen::Vector2f;
 
   v2f tc[4]{v2f{0.0f, 0.0f}, v2f{0.0f, 1.0f}, v2f{1.0f, 0.0f}, v2f{1.0f, 1.0f}};
   auto make_side_pos = [](size_t index, const v3f& x, const v3f& y) -> v3f {
@@ -172,9 +172,9 @@ void MeshComponent::MakeCube(float width, const glm::vec3& color,
     }
   };
 
-  constexpr v3f x(1.0f, 0.0f, 0.0f);
-  constexpr v3f y(0.0f, 1.0f, 0.0f);
-  constexpr v3f z(0.0f, 0.0f, 1.0f);
+  v3f x(1.0f, 0.0f, 0.0f);
+  v3f y(0.0f, 1.0f, 0.0f);
+  v3f z(0.0f, 0.0f, 1.0f);
 
   add_side(x, y, z);
   add_side(-z, y, x);
